@@ -1,0 +1,36 @@
+{
+  "name": "@home-kitchen/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/api/src/server.js",
+    "test": "jest --runInBand",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "smoke:gemini": "tsx scripts/gemini-smoke.ts",
+    "db:reset": "tsx scripts/reset-test-db.ts",
+    "seed:sample": "node scripts/seed-sample.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.9.0",
+    "@home-kitchen/shared": "*",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.5",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
