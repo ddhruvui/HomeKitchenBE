@@ -11,5 +11,7 @@ export async function clearTestDb() {
   if (!db) return;
   const cols = await db.collections();
   await Promise.all(cols.map((c) => c.deleteMany({})));
+  // the app seeds the four default stores once per process; tests start from an empty catalog
+  (globalThis as unknown as { __homeKitchenDefaults?: unknown }).__homeKitchenDefaults = Promise.resolve();
 }
 export async function closeTestDb() { await disconnectDb(); }

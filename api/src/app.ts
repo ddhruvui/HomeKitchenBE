@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import cors from 'cors';
 import mongoose from 'mongoose';
 import { connectDb, currentDbName } from './db';
+import { ensureDefaultStores } from './defaults';
 import { HttpError } from './http';
 import { stores } from './routes/stores';
 import { settings } from './routes/settings';
@@ -22,7 +23,10 @@ export function buildApp(opts: { generate?: Generate } = {}) {
   app.get('/api/health', async (_req, res, next) => {
     try { await connectDb(); res.json({ ok: true, db: currentDbName() }); } catch (e) { next(e); }
   });
-  app.use('/api', async (_req, _res, next) => { try { await connectDb(); next(); } catch (e) { next(e); } });
+  const g = globalThis as unknown as { __homeKitchenDefaults?: Promise<unknown> };
+  app.use('/api', async (_req, _res, next) => {
+    try { await connectDb(); if (!g.__homeKitchenDefaults) g.__homeKitchenDefaults = ensureDefaultStores(); await g.__homeKitchenDefaults; next(); } catch (e) { next(e); }
+  });
 
   app.use('/api/stores', stores);
   app.use('/api/settings', settings);

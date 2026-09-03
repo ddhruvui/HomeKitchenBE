@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke:gemini": "tsx scripts/gemini-smoke.ts",
     "db:reset": "tsx scripts/reset-test-db.ts",
-    "seed:sample": "node scripts/seed-sample.mjs"
+    "seed:sample": "node scripts/seed-sample.mjs",
+    "seed:stores": "tsx scripts/seed-stores.ts"
   },
   "dependencies": {
     "@google/genai": "^1.9.0",

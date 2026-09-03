@@ -7,6 +7,20 @@ beforeAll(openTestDb); beforeEach(clearTestDb); afterAll(closeTestDb);
 
 async function store(name = 'Costco') { return (await request(app).post('/api/stores').send({ name, color: '#4f8a5f' })).body; }
 
+describe('default stores', () => {
+  test('are created once when the catalog is empty, and never overwrite what is there', async () => {
+    const { ensureDefaultStores } = await import('../defaults');
+    expect((await ensureDefaultStores()).added).toEqual(['Costco', 'Indian Store', 'Walmart', 'ShopRite']);
+    expect((await ensureDefaultStores()).added).toEqual([]);
+    const costco = (await request(app).get('/api/stores')).body.find((s: { name: string }) => s.name === 'Costco');
+    await request(app).put(`/api/stores/${costco.id}`).send({ color: '#000000', sortOrder: 9 }).expect(200);
+    await ensureDefaultStores();
+    const again = (await request(app).get('/api/stores')).body.find((s: { name: string }) => s.name === 'Costco');
+    expect(again).toMatchObject({ color: '#000000', sortOrder: 9 });
+    expect((await request(app).get('/api/stores')).body).toHaveLength(4);
+  });
+});
+
 describe('health', () => {
   test('reports the test database', async () => {
     const r = await request(app).get('/api/health');
