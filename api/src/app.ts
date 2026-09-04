@@ -20,6 +20,13 @@ export function buildApp(opts: { generate?: Generate } = {}) {
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
 
+  // The bare domain is a Vercel 404 otherwise; answered without touching Mongo.
+  app.get('/', (_req, res) => res.json({
+    name: 'Home Kitchen API',
+    health: '/api/health',
+    routes: ['/api/stores', '/api/settings', '/api/ingredients', '/api/recipes', '/api/plan', '/api/fresh-stock', '/api/lists', '/api/today', '/api/ai'],
+  }));
+
   app.get('/api/health', async (_req, res, next) => {
     try { await connectDb(); res.json({ ok: true, db: currentDbName() }); } catch (e) { next(e); }
   });

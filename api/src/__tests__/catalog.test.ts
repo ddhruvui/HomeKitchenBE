@@ -115,3 +115,17 @@ describe('ingredients', () => {
     expect((await request(app).get('/api/ingredients/needs-bridge')).body).toEqual([]);
   });
 });
+
+describe('the bare domain', () => {
+  test('answers with the route index rather than a 404', async () => {
+    const r = await request(app).get('/');
+    expect(r.status).toBe(200);
+    expect(r.body.health).toBe('/api/health');
+    expect(r.body.routes).toContain('/api/today');
+  });
+
+  test('anything else still 404s', async () => {
+    const r = await request(app).get('/favicon.ico');
+    expect(r.status).toBe(404); expect(r.body.error).toMatch(/no route/);
+  });
+});
