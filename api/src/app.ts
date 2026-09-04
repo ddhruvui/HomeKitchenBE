@@ -13,6 +13,7 @@ import { freshStock } from './routes/freshStock';
 import { lists } from './routes/lists';
 import { today } from './routes/today';
 import { aiRoutes } from './routes/ai';
+import { cron } from './routes/cron';
 import type { Generate } from './gemini';
 
 export function buildApp(opts: { generate?: Generate } = {}) {
@@ -44,6 +45,7 @@ export function buildApp(opts: { generate?: Generate } = {}) {
   app.use('/api/lists', lists);
   app.use('/api/today', today);
   app.use('/api/ai', aiRoutes(opts.generate));
+  app.use('/api/cron', cron);
 
   app.use((req, res) => { res.status(404).json({ error: `no route for ${req.method} ${req.path}` }); });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

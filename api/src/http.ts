@@ -7,6 +7,7 @@ export class HttpError extends Error {
 export const notFound = (what: string) => new HttpError(404, `${what} not found`);
 export const bad = (message: string, details?: unknown) => new HttpError(400, message, details);
 export const conflict = (message: string) => new HttpError(409, message);
+export const unauthorized = (message = 'unauthorized') => new HttpError(401, message);
 
 export const asyncH = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>): RequestHandler =>
   (req, res, next) => { fn(req, res, next).catch(next); };

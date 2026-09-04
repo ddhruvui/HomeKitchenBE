@@ -16,3 +16,9 @@ npm run dev         # API on http://localhost:3000
 ```
 
 The API reads `api/.env` (copy from `api/.env.example`). `USE_TEST_DB` defaults to **true**, which means `HomeKitchenTest`; set it to `false` to point at the production database named by `DB_NAME`.
+
+A daily Vercel cron calls `GET /api/cron/cleanup`, which deletes planned days more than three weeks old; `CRON_SECRET` (when set) has to arrive as `Authorization: Bearer $CRON_SECRET`. To run it by hand:
+
+```bash
+curl http://localhost:3000/api/cron/cleanup
+```
