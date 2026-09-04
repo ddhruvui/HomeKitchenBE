@@ -15,20 +15,22 @@ describe('todayView', () => {
   const I = { onion, m: masala };
 
   test('breakfast ×1, dinner ×2, lunch is yesterday, pantry lines keep their amount', () => {
-    const v = todayView({ date: '2026-09-06', breakfast: ['t'], dinner: ['pav'] }, { date: '2026-09-05', breakfast: [], dinner: ['pav'] }, '2026-09-06', R, I, { people: 2, weekStartsOn: 6 });
+    const days = [{ date: '2026-09-05', breakfast: [], dinner: ['pav'] }, { date: '2026-09-06', breakfast: ['t'], dinner: ['pav'] }];
+    const v = todayView({ date: '2026-09-06', days, ekadashi: [], recipes: R, ingredients: I, settings: { people: 2, weekStartsOn: 6 } });
     expect(v.breakfast[0].lines[0].qty).toBe(0.5);
     expect(v.dinner[0].lines[0]).toMatchObject({ qty: 2, unit: 'cup', note: 'chopped' });
     expect(v.dinner[0].lines[1]).toMatchObject({ name: 'Masala', qty: 4, unit: 'tbsp' });
     expect(v.dinner[0].steps).toEqual(['Boil potatoes.', 'Mash.']);
-    expect(v.lunch).toEqual(['Pav Bhaji']);
+    expect(v.lunch).toEqual(['Pav Bhaji']); expect(v.lunchFrom).toBe('2026-09-05'); expect(v).toMatchObject({ isEkadashi: false, dinnerCookedOn: '2026-09-06', cookAhead: null });
   });
   test('four people doubles everything again', () => {
-    const v = todayView({ date: '2026-09-06', breakfast: ['t'], dinner: ['pav'] }, undefined, '2026-09-06', R, I, { people: 4, weekStartsOn: 6 });
+    const days = [{ date: '2026-09-06', breakfast: ['t'], dinner: ['pav'] }];
+    const v = todayView({ date: '2026-09-06', days, ekadashi: [], recipes: R, ingredients: I, settings: { people: 4, weekStartsOn: 6 } });
     expect(v.breakfast[0].factor).toBe(2); expect(v.dinner[0].factor).toBe(4); expect(v.dinner[0].lines[0].qty).toBe(4); expect(v.lunch).toEqual([]);
   });
   test('an unplanned day is empty, not an error', () => {
-    const v = todayView(undefined, undefined, '2026-09-06', R, I, { people: 2, weekStartsOn: 6 });
-    expect(v).toMatchObject({ breakfast: [], lunch: [], dinner: [] });
+    const v = todayView({ date: '2026-09-06', days: [], ekadashi: [], recipes: R, ingredients: I, settings: { people: 2, weekStartsOn: 6 } });
+    expect(v).toMatchObject({ breakfast: [], lunch: [], lunchFrom: null, dinner: [], cookAhead: null });
   });
 });
 

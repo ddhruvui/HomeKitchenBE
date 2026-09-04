@@ -24,6 +24,9 @@ describe('plan', () => {
     expect(w.days[0].lunch).toEqual([{ id: pav.id, title: 'Pav Bhaji' }]);
     expect(w.days[1].lunch[0].title).toBe('Pav Bhaji');
     expect(w.days[2].lunch).toEqual([]);
+    // with nothing marked, every day is an ordinary one: cooked on the day, lunch from the evening before
+    expect(w.days[0]).toMatchObject({ isEkadashi: false, lunchFrom: '2026-09-04', dinnerCookedOn: '2026-09-05', cookAhead: null });
+    expect(w.days[2]).toMatchObject({ lunchFrom: null, dinnerCookedOn: '2026-09-07' });
   });
   test('several dishes in one slot', async () => {
     const { pav, kadhi } = await seed();
@@ -57,6 +60,7 @@ describe('today', () => {
     expect(t.dinner[0].lines[0]).toMatchObject({ name: 'Onion', qty: 2, unit: 'cup' });
     expect(t.dinner[0].steps).toEqual(['Boil.']);
     expect(t.lunch).toEqual(['Pav Bhaji']);
+    expect(t).toMatchObject({ isEkadashi: false, lunchFrom: '2026-09-05', dinnerCookedOn: '2026-09-06', cookAhead: null });
     await request(app).put('/api/settings').send({ people: 4 });
     const t4 = (await request(app).get('/api/today?date=2026-09-06')).body;
     expect(t4.breakfast[0].lines[0].qty).toBe(2); expect(t4.dinner[0].lines[0].qty).toBe(4);

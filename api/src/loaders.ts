@@ -1,5 +1,5 @@
 import type { Ingredient, PlannedDay, Recipe, Settings, Store, FreshStockEntry } from '@home-kitchen/shared';
-import { FreshStockModel, IngredientModel, PlannedDayModel, RecipeModel, SettingsModel, StoreModel } from './models';
+import { EkadashiDayModel, FreshStockModel, IngredientModel, PlannedDayModel, RecipeModel, SettingsModel, StoreModel } from './models';
 
 const s = (v: unknown) => String(v);
 
@@ -38,6 +38,10 @@ export async function loadStores(): Promise<Store[]> {
 }
 export async function loadDays(start: string, end: string): Promise<PlannedDay[]> {
   return (await PlannedDayModel.find({ date: { $gte: start, $lte: end } }).lean()).map((d) => toPlannedDay(d as Record<string, unknown>));
+}
+/** Just the marked dates — the domain helpers (§4) only ever ask "is this one a fast?". */
+export async function loadEkadashi(start: string, end: string): Promise<string[]> {
+  return (await EkadashiDayModel.find({ date: { $gte: start, $lte: end } }).sort({ date: 1 }).lean()).map((d) => d.date as string);
 }
 export async function loadFreshStock(): Promise<FreshStockEntry[]> {
   return (await FreshStockModel.find().lean()).map((d) => ({ ingredientId: s(d.ingredientId), qty: d.qty as number, unit: d.unit as FreshStockEntry['unit'] }));

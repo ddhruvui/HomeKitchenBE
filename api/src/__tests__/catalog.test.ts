@@ -122,6 +122,7 @@ describe('the bare domain', () => {
     expect(r.status).toBe(200);
     expect(r.body.health).toBe('/api/health');
     expect(r.body.routes).toContain('/api/today');
+    expect(r.body.routes).toContain('/api/ekadashi');
   });
 
   test('anything else still 404s', async () => {

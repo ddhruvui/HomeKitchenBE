@@ -59,6 +59,12 @@ const PlannedDaySchema = new Schema({
   dinner: { type: [{ type: Schema.Types.ObjectId, ref: 'Recipe' }], default: [] },
 }, opts);
 
+// A fast day is a bare mark on a date (§4); the dish itself lives in that day's PlannedDay.dinner.
+const EkadashiDaySchema = new Schema({
+  date: { type: String, required: true, unique: true, match: /^\d{4}-\d{2}-\d{2}$/ },
+  name: { type: String, trim: true },
+}, opts);
+
 const FreshStockSchema = new Schema({
   ingredientId: { type: Schema.Types.ObjectId, ref: 'Ingredient', required: true, unique: true },
   qty: { type: Number, required: true, min: 0 },
@@ -92,5 +98,6 @@ export const SettingsModel = mongoose.model('Settings', SettingsSchema);
 export const IngredientModel = mongoose.model('Ingredient', IngredientSchema);
 export const RecipeModel = mongoose.model('Recipe', RecipeSchema);
 export const PlannedDayModel = mongoose.model('PlannedDay', PlannedDaySchema);
+export const EkadashiDayModel = mongoose.model('EkadashiDay', EkadashiDaySchema);
 export const FreshStockModel = mongoose.model('FreshStock', FreshStockSchema);
 export const ShoppingListModel = mongoose.model('ShoppingList', ShoppingListSchema);

@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { addDays, isValidDate, todayView } from '@home-kitchen/shared';
+import { MAX_CARRY_LOOKBACK, addDays, isValidDate, todayView } from '@home-kitchen/shared';
 import { asyncH, parse } from '../http';
-import { loadDays, loadIngredientMap, loadRecipeMap, loadSettings } from '../loaders';
+import { loadDays, loadEkadashi, loadIngredientMap, loadRecipeMap, loadSettings } from '../loaders';
 
 export const today = Router();
-/** §4 "Cooking from the plan": derived on read, never stored. */
+/** §4 "Cooking from the plan": derived on read, never stored. The window spans the carry-over lookback
+ * behind today and tomorrow ahead of it, because a fast tomorrow is cooked tonight. */
 today.get('/', asyncH(async (req, res) => {
   const date = parse(z.string().refine(isValidDate, 'date must be YYYY-MM-DD'), req.query.date ?? new Date().toISOString().slice(0, 10));
-  const [days, recipes, ingredients, settings] = await Promise.all([loadDays(addDays(date, -1), date), loadRecipeMap(), loadIngredientMap(), loadSettings()]);
-  const day = days.find((d) => d.date === date), prev = days.find((d) => d.date === addDays(date, -1));
-  res.json(todayView(day, prev, date, recipes, ingredients, settings));
+  const from = addDays(date, -MAX_CARRY_LOOKBACK), to = addDays(date, 1);
+  const [days, ekadashi, recipes, ingredients, settings] = await Promise.all([loadDays(from, to), loadEkadashi(from, to), loadRecipeMap(), loadIngredientMap(), loadSettings()]);
+  res.json(todayView({ date, days, ekadashi, recipes, ingredients, settings }));
 }));

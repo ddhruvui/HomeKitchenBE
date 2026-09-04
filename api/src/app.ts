@@ -12,6 +12,7 @@ import { plan } from './routes/plan';
 import { freshStock } from './routes/freshStock';
 import { lists } from './routes/lists';
 import { today } from './routes/today';
+import { ekadashi } from './routes/ekadashi';
 import { aiRoutes } from './routes/ai';
 import { cron } from './routes/cron';
 import type { Generate } from './gemini';
@@ -25,7 +26,7 @@ export function buildApp(opts: { generate?: Generate } = {}) {
   app.get('/', (_req, res) => res.json({
     name: 'Home Kitchen API',
     health: '/api/health',
-    routes: ['/api/stores', '/api/settings', '/api/ingredients', '/api/recipes', '/api/plan', '/api/fresh-stock', '/api/lists', '/api/today', '/api/ai'],
+    routes: ['/api/stores', '/api/settings', '/api/ingredients', '/api/recipes', '/api/plan', '/api/fresh-stock', '/api/lists', '/api/today', '/api/ekadashi', '/api/ai'],
   }));
 
   app.get('/api/health', async (_req, res, next) => {
@@ -44,6 +45,7 @@ export function buildApp(opts: { generate?: Generate } = {}) {
   app.use('/api/fresh-stock', freshStock);
   app.use('/api/lists', lists);
   app.use('/api/today', today);
+  app.use('/api/ekadashi', ekadashi);
   app.use('/api/ai', aiRoutes(opts.generate));
   app.use('/api/cron', cron);
 

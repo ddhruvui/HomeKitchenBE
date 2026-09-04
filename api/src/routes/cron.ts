@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { addDays } from '@home-kitchen/shared';
-import { PlannedDayModel } from '../models';
+import { EkadashiDayModel, PlannedDayModel } from '../models';
 import { asyncH, unauthorized } from '../http';
 
 /** How much of the past is worth keeping: three weeks. Older plans are weeks nobody opens again. */
@@ -16,11 +16,12 @@ cron.use((req, _res, next) => {
   next();
 });
 
-/** Delete planned days older than three weeks. GET because a Vercel cron only ever issues GETs (§8). */
+/** Delete planned days, and the fast days beside them, older than three weeks. GET because a Vercel cron only ever issues GETs (§8). */
 cron.get('/cleanup', asyncH(async (_req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   const before = addDays(today, -KEEP_DAYS);
   // dates are YYYY-MM-DD strings, so "older than" is a plain string comparison (§12 J)
-  const { deletedCount } = await PlannedDayModel.deleteMany({ date: { $lt: before } });
-  res.json({ ok: true, today, before, deletedPlannedDays: deletedCount });
+  const stale = { date: { $lt: before } };
+  const [plans, fasts] = await Promise.all([PlannedDayModel.deleteMany(stale), EkadashiDayModel.deleteMany(stale)]);
+  res.json({ ok: true, today, before, deletedPlannedDays: plans.deletedCount, deletedEkadashiDays: fasts.deletedCount });
 }));
