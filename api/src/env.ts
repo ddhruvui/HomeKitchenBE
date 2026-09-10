@@ -19,5 +19,12 @@ export function resolveMongoUri(env: NodeJS.ProcessEnv = process.env): string {
 export const config = {
   port: Number(process.env.PORT ?? 3000),
   geminiKey: process.env.GEMINI_API_KEY,
-  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-3-flash-preview',
+  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-3.5-flash',
+  /** Flash models think by default, and on our two prompts they burn ~60k thought tokens and three minutes on what takes four
+   *  seconds without it. Neither prompt is a reasoning problem, so we turn thinking down; MINIMAL is the floor Gemini 3 accepts. */
+  geminiThinking: process.env.GEMINI_THINKING ?? 'MINIMAL',
+  /** A call that has not answered by now never will in a way the browser is still waiting for. */
+  geminiTimeoutMs: Number(process.env.GEMINI_TIMEOUT_MS ?? 30_000),
+  /** Reading a page (~20s) or watching a video (~17s) is slower than answering from memory (~3s), so those get their own deadline. */
+  geminiSourceTimeoutMs: Number(process.env.GEMINI_SOURCE_TIMEOUT_MS ?? 60_000),
 };

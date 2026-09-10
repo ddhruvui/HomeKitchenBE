@@ -1,33 +1,59 @@
 import { z } from 'zod';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type GenerateContentConfig, type ThinkingLevel } from '@google/genai';
 import { config } from './env';
 import { ALL_UNITS, FORMS, type Form, type IngredientKind, type Unit } from '@home-kitchen/shared';
+import type { ParsedRecipe } from './recipeSource';
 
 export interface BridgeRequest { id: string; name: string; countUnit?: 'each' | 'bunch'; wantCup: boolean; wantCount: boolean; }
 export interface BridgeEstimate { id: string; ozPerCup?: number; ozPerCount?: number; rationale: string; }
 
+/** Reading a page or watching a video is slower than answering from memory, so those callers say so and get a longer budget. */
+export interface GenerateOpts { videoUrl?: string; readUrl?: boolean; timeoutMs?: number }
 /** The one function that knows a model exists. Injected so tests never call the network. */
-export type Generate = (prompt: string) => Promise<string>;
+export type Generate = (prompt: string, opts?: GenerateOpts) => Promise<string>;
+
+/** An error whose message is already a sentence for the person reading it, so callers pass it through instead of wrapping it. */
+export class ModelError extends Error {
+  constructor(message: string) { super(message); this.name = 'ModelError'; }
+}
+const statusOf = (e: unknown) => (e as { status?: number })?.status;
+const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/** Not every model accepts every thinking level (3.8-flash rejects MINIMAL), so a refusal drops the setting rather than the call. */
+const rejectsThinking = (e: unknown) => statusOf(e) === 400 && /thinking/i.test(messageOf(e));
 
 export function makeGeminiGenerate(apiKey = config.geminiKey, model = config.geminiModel): Generate {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
   const ai = new GoogleGenAI({ apiKey });
-  // Gemini answers 429/503 under load; those are worth a couple of short retries before the user hears about it.
-  return async (prompt) => {
-    let lastErr: unknown;
-    for (let attempt = 0; attempt < 3; attempt++) {
+  // 503 means the model is momentarily oversubscribed and a short wait fixes it. 429 does not: the free tier hands out
+  // 5-10 requests a minute and tells us to come back in ~17s, which is longer than anyone is willing to watch a spinner.
+  return async (prompt, opts = {}) => {
+    let thinking = config.geminiThinking;
+    let lastErr: unknown = new Error('timed out');
+    const budget = opts.timeoutMs ?? config.geminiTimeoutMs;
+    const deadline = Date.now() + budget;                      // one budget for the whole call, retries included
+    const contents = opts.videoUrl ? [{ role: 'user', parts: [{ fileData: { fileUri: opts.videoUrl } }, { text: prompt }] }] : prompt;
+    for (let attempt = 0; attempt < 3 && Date.now() < deadline; attempt++) {
       try {
-        const res = await ai.models.generateContent({ model, contents: prompt, config: { responseMimeType: 'application/json', temperature: 0.1 } });
+        const cfg: GenerateContentConfig = { responseMimeType: 'application/json', temperature: 0.1, abortSignal: AbortSignal.timeout(deadline - Date.now()) };
+        if (thinking) cfg.thinkingConfig = { thinkingLevel: thinking as ThinkingLevel };
+        if (opts.readUrl) cfg.tools = [{ urlContext: {} }];
+        const res = await ai.models.generateContent({ model, contents, config: cfg });
         return res.text ?? '';
       } catch (e) {
         lastErr = e;
-        const status = (e as { status?: number })?.status;
-        if (status !== 429 && status !== 503) break;
+        if (rejectsThinking(e)) { thinking = ''; continue; }
+        if (statusOf(e) !== 503) break;
         await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
       }
     }
-    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
-    throw new Error(/UNAVAILABLE|high demand|503/.test(msg) ? 'the model is busy right now — try again in a moment' : msg);
+    const msg = messageOf(lastErr);
+    if (statusOf(lastErr) === 429 || /RESOURCE_EXHAUSTED|quota/i.test(msg)) {
+      const wait = msg.match(/retry in ([0-9.]+)s/i)?.[1];
+      throw new ModelError(`The free Gemini quota for ${model} is used up for the minute — try again${wait ? ` in ${Math.ceil(Number(wait))}s` : ' shortly'}.`);
+    }
+    if (/aborted|AbortError|timed? ?out/i.test(msg)) throw new ModelError(`${model} did not answer within ${Math.round(budget / 1000)}s — try again.`);
+    if (/UNAVAILABLE|high demand|503/.test(msg)) throw new ModelError('The model is busy right now — try again in a moment.');
+    throw new Error(msg);
   };
 }
 
@@ -56,12 +82,32 @@ export function sanitize(e: { id: string; ozPerCup?: number; ozPerCount?: number
   return out.ozPerCup === undefined && out.ozPerCount === undefined ? null : out;
 }
 
+/** Scan out the first complete JSON value, brace by brace. A greedy regex fails the case we actually hit in the wild:
+ *  a valid object followed by a second one, where "first { to last }" spans both and parses as neither. */
+function firstJsonValue(text: string, open: '{' | '['): string | null {
+  const close = open === '{' ? '}' : ']';
+  const start = text.indexOf(open);
+  if (start < 0) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (esc) { esc = false; continue; }
+    if (inStr) { if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === open) depth++;
+    else if (c === close && --depth === 0) return text.slice(start, i + 1);
+  }
+  return null;
+}
+function unfence(text: string): string {
+  return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+}
 function extractJson(text: string): unknown {
-  const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  try { return JSON.parse(t); } catch { /* fall through */ }
-  const m = t.match(/\[[\s\S]*\]/);
+  const t = unfence(text);
+  try { return JSON.parse(t); } catch { /* the model sometimes adds a word, or a second value, after the first */ }
+  const m = firstJsonValue(t, '[');
   if (!m) throw new Error('model returned no JSON array');
-  return JSON.parse(m[0]);
+  return JSON.parse(m);
 }
 
 // ---------------- Recipe drafting (§3 "Drafting a recipe with AI") ----------------
@@ -84,12 +130,14 @@ export function normalizeUnit(u: unknown): Unit | undefined {
 export interface DraftLine { name: string; qty?: number; unit?: Unit; rawUnit?: string; note?: string; kind?: IngredientKind; form?: Form; }
 export interface RecipeDraft { title: string; lines: DraftLine[]; steps: string[]; }
 
-export function buildRecipePrompt(title: string): string {
+const SHAPE = '{"title": string, "ingredients": [{"name": string, "qty": number, "unit": string, "note": string, "kind": string, "form": string}], "steps": [string]}';
+
+/** The house rules every draft obeys, whatever the recipe came from. `serving` is the one line that differs by source. */
+function recipeRules(serving: string): string[] {
   return [
-    'You write home-cooking recipes for a family shopping app. Return ONLY a JSON object, no prose:',
-    '{"title": string, "ingredients": [{"name": string, "qty": number, "unit": string, "note": string, "kind": string, "form": string}], "steps": [string]}',
+    'You write home-cooking recipes for a family shopping app. Return ONLY a JSON object, no prose:', SHAPE,
     'Rules:',
-    '- Amounts are for TWO people, one meal.',
+    serving,
     `- US customary units only. "unit" must be one of: ${ALL_UNITS.join(', ')} (floz means fluid ounces). Never metric.`,
     '- Name each ingredient the way it is labelled at a US supermarket or an Indian grocer ("Yellow Onion", "Toor Dal", "Paneer", "Coriander"). One ingredient per line, no combined lines.',
     '- Every ingredient the cook needs, spices, salt and oil included, each with a numeric qty. Never "to taste". Do not list water.',
@@ -97,7 +145,45 @@ export function buildRecipePrompt(title: string): string {
     `- "form" is the aisle, one of: ${FORMS.join(', ')}.`,
     '- "note" is optional prep detail ("finely chopped"). Omit it when there is none.',
     '- "steps": 4 to 10 short imperative sentences in cooking order.',
-    `Dish: "${title.replace(/["\\]/g, '')}"`,
+  ];
+}
+const quoted = (v: string) => v.replace(/["\\]/g, '');
+/** Every source is rescaled on the way in, because every recipe in the book is for two and the household count scales it later. */
+const scaleRule = (servings?: number) => servings && servings !== 2
+  ? `- The source serves ${servings}. Rescale every amount to TWO people, one meal.`
+  : '- Amounts are for TWO people, one meal. Rescale the source if it serves a different number.';
+
+export function buildRecipePrompt(title: string): string {
+  return [...recipeRules('- Amounts are for TWO people, one meal.'), `Dish: "${quoted(title)}"`].join('\n');
+}
+
+/** The page published its own ingredient list, so the model is only rewriting it into our vocabulary — no invention, no fetching. */
+export function buildSourcePrompt(parsed: ParsedRecipe, sourceLabel: string): string {
+  return [
+    ...recipeRules(scaleRule(parsed.servings)),
+    '- Use ONLY the ingredients below. Do not add or drop any. Keep the source\'s own steps, shortened to imperative sentences.',
+    `Recipe from ${sourceLabel}${parsed.title ? `, titled "${quoted(parsed.title)}"` : ''}:`,
+    'Ingredients:', ...parsed.ingredients.map((l) => `- ${l}`),
+    ...(parsed.steps.length ? ['Steps:', ...parsed.steps.map((l, i) => `${i + 1}. ${l}`)] : []),
+  ].join('\n');
+}
+
+/** No structured data and no video: the model fetches the page itself. Slower, and it fails on sites that block robots. */
+export function buildUrlPrompt(url: string): string {
+  return [
+    ...recipeRules(scaleRule()),
+    '- Take the recipe from the page, not from memory. If the page holds no recipe, return {"ingredients": []}.',
+    `Read this page and return its recipe: ${quoted(url)}`,
+  ].join('\n');
+}
+
+/** A video shows one cook making one dish, often including sub-recipes made from scratch; we want the dish. */
+export function buildVideoPrompt(): string {
+  return [
+    ...recipeRules(scaleRule()),
+    '- Take the recipe from the video, not from memory. Use the amounts the cook states or shows.',
+    '- If the video makes a component from scratch that is normally bought (a spice blend, a paste), list that component as ONE pantry ingredient rather than its sub-ingredients.',
+    'Extract the recipe cooked in this video.',
   ].join('\n');
 }
 
@@ -137,12 +223,22 @@ export function sanitizeRecipeDraft(raw: unknown, requestedTitle: string): Recip
 export async function draftRecipe(title: string, generate: Generate): Promise<RecipeDraft> {
   return sanitizeRecipeDraft(extractJsonValue(await generate(buildRecipePrompt(title))), title);
 }
+
+/** A draft from a link or a video. `fallbackTitle` is used only when the source gave us no name of its own. */
+export async function draftFromSource(
+  generate: Generate,
+  fallbackTitle: string,
+  prompt: string,
+  opts: GenerateOpts,
+): Promise<RecipeDraft> {
+  return sanitizeRecipeDraft(extractJsonValue(await generate(prompt, opts)), fallbackTitle);
+}
 function extractJsonValue(text: string): unknown {
-  const t = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  try { return JSON.parse(t); } catch { /* fall through */ }
-  const m = t.match(/\{[\s\S]*\}/);
+  const t = unfence(text);
+  try { return JSON.parse(t); } catch { /* ditto */ }
+  const m = firstJsonValue(t, '{');
   if (!m) throw new Error('model returned no JSON object');
-  return JSON.parse(m[0]);
+  return JSON.parse(m);
 }
 
 /** §3 steps 2–3: one call for the whole batch, then the sanitizer. Nothing is written here; the caller confirms. */
