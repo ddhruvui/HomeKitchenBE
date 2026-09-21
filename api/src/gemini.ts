@@ -10,8 +10,10 @@ export interface BridgeEstimate { id: string; ozPerCup?: number; ozPerCount?: nu
 export interface ChatTurn { role: 'user' | 'model'; text: string }
 /** `text` asks for prose rather than JSON; `history` and `system` are what make a call a conversation rather than a question. */
 export interface GenerateOpts { timeoutMs?: number; history?: ChatTurn[]; system?: string; text?: boolean }
+/** Which model actually answered — with a fallback chain that is not knowable before the call. */
+export interface GenerateResult { text: string; model: string }
 /** The one function that knows a model exists. Injected so tests never call the network. */
-export type Generate = (prompt: string, opts?: GenerateOpts) => Promise<string>;
+export type Generate = (prompt: string, opts?: GenerateOpts) => Promise<GenerateResult>;
 
 /** An error whose message is already a sentence for the person reading it, so callers pass it through instead of wrapping it. */
 export class ModelError extends Error {
@@ -52,36 +54,57 @@ function quotaError(err: unknown, msg: string, model: string): ModelError {
   return new ModelError(`The free Gemini quota for ${model} is used up for the minute — try again${wait ? ` in ${Math.ceil(Number(wait))}s` : ' shortly'}.`);
 }
 
-export function makeGeminiGenerate(apiKey = config.geminiKey, model = config.geminiModel): Generate {
+export function makeGeminiGenerate(apiKey = config.geminiKey, model = config.geminiModel, fallbacks = config.geminiFallbackModels): Generate {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
   const ai = new GoogleGenAI({ apiKey });
-  // 503 means the model is momentarily oversubscribed and a short wait fixes it. 429 does not: the free tier hands out
-  // 5-10 requests a minute and tells us to come back in ~17s, which is longer than anyone is willing to watch a spinner.
+  // Two failures are routine enough to work around before bothering anyone: 503/500 means the model is momentarily
+  // oversubscribed, so the same model is worth one more go; 429 means this model's day is spent, and since the free
+  // tier counts per model, the only thing that helps is a different one. Everything else would fail everywhere.
   return async (prompt, opts = {}) => {
     let thinking = config.geminiThinking;
+    let droppedThinking = false;
     let lastErr: unknown = new Error('timed out');
     const budget = opts.timeoutMs ?? config.geminiTimeoutMs;
-    const deadline = Date.now() + budget;                      // one budget for the whole call, retries included
-    for (let attempt = 0; attempt < 3 && Date.now() < deadline; attempt++) {
+    const deadline = Date.now() + budget;                      // one budget for the whole call, fallbacks included
+    const chain = [model, model, ...fallbacks.filter((m) => m !== model)];
+    let used = model;
+    let mainErr: unknown = null;                               // why the primary was abandoned — the actionable problem
+    for (let i = 0; i < chain.length && Date.now() < deadline; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 1500));
+      used = chain[i];
       try {
         // A structured answer wants to be repeatable; a conversation that repeats itself on a follow-up is a worse conversation.
-        const cfg: GenerateContentConfig = { temperature: opts.text ? 0.4 : 0.1, abortSignal: AbortSignal.timeout(deadline - Date.now()) };
+        const cfg: GenerateContentConfig = { temperature: opts.text ? 0.4 : 0.1, abortSignal: AbortSignal.timeout(Math.max(deadline - Date.now(), 1)) };
         if (!opts.text) cfg.responseMimeType = 'application/json';
         if (opts.system) cfg.systemInstruction = opts.system;
         if (thinking) cfg.thinkingConfig = { thinkingLevel: thinking as ThinkingLevel };
-        const res = await ai.models.generateContent({ model, contents: asContents(prompt, opts.history), config: cfg });
-        return res.text ?? '';
+        const res = await ai.models.generateContent({ model: used, contents: asContents(prompt, opts.history), config: cfg });
+        return { text: res.text ?? '', model: used };
       } catch (e) {
         lastErr = e;
-        if (rejectsThinking(e)) { thinking = ''; continue; }
-        if (statusOf(e) !== 503) break;
-        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        // Not every model accepts every thinking level (3.8-flash rejects MINIMAL), so a refusal drops the setting
+        // and gives that same model another go rather than writing it off.
+        if (rejectsThinking(e) && !droppedThinking) { thinking = ''; droppedThinking = true; i--; continue; }
+        const status = statusOf(e);
+        const outOfQuota = status === 429;
+        if (used === model) mainErr = e;
+        // A fallback failing for any reason just means "try the next one"; the primary failing for a reason a
+        // different model would share (bad key, bad request) means stopping.
+        if (!(status === 503 || status === 500 || outOfQuota || used !== model)) break;
+        // Falling back is invisible from the outside except for the model id on the answer; say so in the log,
+        // because a chain quietly carrying every request means the primary has been broken for a while.
+        if (i < chain.length - 1) console.warn(`[gemini] ${used} answered ${status ?? '?'} (${i + 1}/${chain.length})`);
+        if (outOfQuota && used === model) i = 1;               // a second go at a spent model is guaranteed to fail
       }
     }
-    const msg = messageOf(lastErr);
-    if (statusOf(lastErr) === 429 || /RESOURCE_EXHAUSTED|quota/i.test(msg)) throw quotaError(lastErr, msg, model);
-    if (/aborted|AbortError|timed? ?out/i.test(msg)) throw new ModelError(`${model} did not answer within ${Math.round(budget / 1000)}s — try again.`);
-    if (/UNAVAILABLE|high demand|503/.test(msg)) throw new ModelError('The model is busy right now — try again in a moment.');
+    // When a fallback broke for its own reason — a retired id, say — the primary's failure is the one worth reporting.
+    const fallbackBroke = mainErr !== null && used !== model && ![503, 500, 429].includes(statusOf(lastErr) as number);
+    const err = fallbackBroke ? mainErr : lastErr;
+    const msg = messageOf(err);
+    const tried = used === model ? model : [model, ...fallbacks.slice(0, Math.max(fallbacks.indexOf(used), 0) + 1)].join(', ');
+    if (statusOf(err) === 429 || /RESOURCE_EXHAUSTED|quota/i.test(msg)) throw quotaError(err, msg, tried);
+    if (/aborted|AbortError|timed? ?out/i.test(msg)) throw new ModelError(`${tried} did not answer within ${Math.round(budget / 1000)}s — try again.`);
+    if (/UNAVAILABLE|high demand|503/.test(msg)) throw new ModelError(`The model is busy right now (tried ${tried}) — try again in a moment.`);
     throw new Error(msg);
   };
 }
@@ -140,12 +163,13 @@ function extractJson(text: string): unknown {
 }
 
 /** §3 steps 2–3: one call for the whole batch, then the sanitizer. Nothing is written here; the caller confirms. */
-export async function estimateBridges(reqs: BridgeRequest[], generate: Generate): Promise<BridgeEstimate[]> {
-  if (reqs.length === 0) return [];
-  const parsed = Raw.safeParse(extractJson(await generate(buildPrompt(reqs))));
+export async function estimateBridges(reqs: BridgeRequest[], generate: Generate): Promise<{ estimates: BridgeEstimate[]; model: string }> {
+  if (reqs.length === 0) return { estimates: [], model: config.geminiModel };
+  const { text, model } = await generate(buildPrompt(reqs));
+  const parsed = Raw.safeParse(extractJson(text));
   if (!parsed.success) throw new Error('model response did not match the expected shape');
   const wanted = new Set(reqs.map((r) => r.id));
-  return parsed.data.filter((e) => wanted.has(e.id)).map(sanitize).filter((e): e is BridgeEstimate => e !== null);
+  return { estimates: parsed.data.filter((e) => wanted.has(e.id)).map(sanitize).filter((e): e is BridgeEstimate => e !== null), model };
 }
 
 // ---------------- Asking about a dish (§3 "Asking the model about a dish") ----------------
@@ -165,9 +189,10 @@ export function chatSystemPrompt(catalog: string[]): string {
 }
 
 /** One turn of the conversation. The whole history arrives from the browser each time; nothing is stored here. */
-export async function askAboutCooking(turns: ChatTurn[], catalog: string[], generate: Generate): Promise<string> {
+export async function askAboutCooking(turns: ChatTurn[], catalog: string[], generate: Generate): Promise<{ reply: string; model: string }> {
   const last = turns[turns.length - 1];
-  const reply = (await generate(last.text, { history: turns.slice(0, -1), system: chatSystemPrompt(catalog), text: true })).trim();
+  const { text, model } = await generate(last.text, { history: turns.slice(0, -1), system: chatSystemPrompt(catalog), text: true });
+  const reply = text.trim();
   if (!reply) throw new ModelError('The model came back with nothing to say — ask again, or put it differently.');
-  return reply.slice(0, 8000);
+  return { reply: reply.slice(0, 8000), model };
 }

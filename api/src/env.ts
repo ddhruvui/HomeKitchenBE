@@ -26,4 +26,8 @@ export const config = {
   geminiThinking: process.env.GEMINI_THINKING ?? 'MINIMAL',
   /** A call that has not answered by now never will in a way the browser is still waiting for. */
   geminiTimeoutMs: Number(process.env.GEMINI_TIMEOUT_MS ?? 30_000),
+  /** Tried in order when the main model is overloaded (503) or out of quota (429 — the free tier's 20 a day is per model).
+   *  The defaults are Google's moving aliases, which cannot go stale the way a pinned id can. Comma-separated; "none" disables. */
+  geminiFallbackModels: (process.env.GEMINI_FALLBACK_MODEL ?? 'gemini-flash-latest,gemini-flash-lite-latest')
+    .split(',').map((m) => m.trim()).filter((m) => m && m.toLowerCase() !== 'none'),
 };

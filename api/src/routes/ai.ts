@@ -41,8 +41,8 @@ export function aiRoutes(generate?: Generate) {
     const reqs = [...wants.values()].filter((w) => w.wantCup || w.wantCount);
     if (reqs.length === 0) return res.json({ estimates: [], model: config.geminiModel });
     const gen = generate ?? (() => { if (!config.geminiKey) throw bad('GEMINI_API_KEY is not configured; enter conversions by hand'); return makeGeminiGenerate(); })();
-    const estimates = await fromModel(estimateBridges(reqs, gen));
-    res.json({ estimates: estimates.map((e) => ({ ...e, name: ings[e.id]?.name })), model: config.geminiModel });
+    const { estimates, model } = await fromModel(estimateBridges(reqs, gen));
+    res.json({ estimates: estimates.map((e) => ({ ...e, name: ings[e.id]?.name })), model });
   }));
   /** One turn of a conversation about a dish. The browser holds the history and sends it back; nothing here is stored, and nothing reaches a recipe except by being typed in. */
   ai.post('/chat', asyncH(async (req, res) => {
@@ -52,8 +52,8 @@ export function aiRoutes(generate?: Generate) {
     if (messages[messages.length - 1].role !== 'user') throw bad('the last message has to be yours');
     const gen = generate ?? (() => { if (!config.geminiKey) throw bad('GEMINI_API_KEY is not configured'); return makeGeminiGenerate(); })();
     const catalog = Object.values(await loadIngredientMap()).map((i) => i.name).sort();
-    const reply = await fromModel(askAboutCooking(messages, catalog, gen));
-    res.json({ reply, model: config.geminiModel });
+    const { reply, model } = await fromModel(askAboutCooking(messages, catalog, gen));
+    res.json({ reply, model });
   }));
   return ai;
 }

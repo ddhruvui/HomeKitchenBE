@@ -16,19 +16,21 @@ describe('sanitize', () => {
 describe('estimateBridges', () => {
   test('one call for the batch, parses fenced JSON, ignores ids it did not ask for', async () => {
     const calls: string[] = [];
-    const gen = async (p: string) => { calls.push(p); return '```json\n[{"id":"a","ozPerCup":5.6,"rationale":"chopped onion"},{"id":"zzz","ozPerCup":1}]\n```'; };
+    const gen = async (p: string) => { calls.push(p); return { text: '```json\n[{"id":"a","ozPerCup":5.6,"rationale":"chopped onion"},{"id":"zzz","ozPerCup":1}]\n```', model: 'gemini-flash-latest' }; };
     const out = await estimateBridges([{ id: 'a', name: 'Onion', countUnit: 'each', wantCup: true, wantCount: false }], gen);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatch(/Onion/);
-    expect(out).toEqual([{ id: 'a', ozPerCup: 5.6, rationale: 'chopped onion' }]);
+    expect(out.estimates).toEqual([{ id: 'a', ozPerCup: 5.6, rationale: 'chopped onion' }]);
+    // whichever model answered is what the route must report, not the one that was configured
+    expect(out.model).toBe('gemini-flash-latest');
   });
   test('no requests means no call', async () => {
     let called = false;
-    expect(await estimateBridges([], async () => { called = true; return '[]'; })).toEqual([]);
+    expect((await estimateBridges([], async () => { called = true; return { text: '[]', model: 'm' }; })).estimates).toEqual([]);
     expect(called).toBe(false);
   });
   test('garbage from the model is an error, not a silent write', async () => {
-    await expect(estimateBridges([{ id: 'a', name: 'X', wantCup: true, wantCount: false }], async () => 'no json here')).rejects.toThrow();
+    await expect(estimateBridges([{ id: 'a', name: 'X', wantCup: true, wantCount: false }], async () => ({ text: 'no json here', model: 'm' }))).rejects.toThrow();
   });
   test('the prompt asks only for what is missing', () => {
     const p = buildPrompt([{ id: 'c', name: 'Coriander', countUnit: 'bunch', wantCup: false, wantCount: true }]);
@@ -38,7 +40,7 @@ describe('estimateBridges', () => {
 
 describe('POST /api/ai/bridges', () => {
   const seen: string[] = [];
-  const app = buildApp({ generate: async (p) => { seen.push(p); return JSON.stringify([{ id: 'ignored', ozPerCup: 1 }]).replace('ignored', p.match(/id "(\w+)"/)![1]); } });
+  const app = buildApp({ generate: async (p) => { seen.push(p); return { text: JSON.stringify([{ id: 'ignored', ozPerCup: 1 }]).replace('ignored', p.match(/id "(\w+)"/)![1]), model: 'gemini-flash-latest' }; } });
   beforeAll(openTestDb); beforeEach(() => { seen.length = 0; return clearTestDb(); }); afterAll(closeTestDb);
 
   test('asks about the ingredients recipes cannot convert, returns suggestions, writes nothing', async () => {
@@ -66,8 +68,9 @@ describe('asking about a dish', () => {
 
   test('the follow-up is the prompt and everything before it is the history', async () => {
     let seen: { prompt: string; opts?: GenerateOpts } | null = null;
-    const reply = await askAboutCooking(turns, ['Potato'], async (prompt, opts) => { seen = { prompt, opts }; return '  Yes, use extra potato.  '; });
+    const { reply, model } = await askAboutCooking(turns, ['Potato'], async (prompt, opts) => { seen = { prompt, opts }; return { text: '  Yes, use extra potato.  ', model: 'gemini-flash-lite-latest' }; });
     expect(reply).toBe('Yes, use extra potato.');
+    expect(model).toBe('gemini-flash-lite-latest');
     expect(seen!.prompt).toBe('Can I skip the capsicum?');
     expect(seen!.opts?.history).toEqual(turns.slice(0, 2));
     expect(seen!.opts?.text).toBe(true);
@@ -75,7 +78,7 @@ describe('asking about a dish', () => {
   });
 
   test('an empty answer is an error, not an empty bubble', async () => {
-    await expect(askAboutCooking(turns, [], async () => '   ')).rejects.toThrow(/nothing to say/);
+    await expect(askAboutCooking(turns, [], async () => ({ text: '   ', model: 'm' }))).rejects.toThrow(/nothing to say/);
   });
 
   test('the prompt carries the house conventions and the catalog', () => {
@@ -88,7 +91,7 @@ describe('asking about a dish', () => {
 
 describe('POST /api/ai/chat', () => {
   const seen: Array<{ prompt: string; opts?: GenerateOpts }> = [];
-  const app = buildApp({ generate: async (prompt, opts) => { seen.push({ prompt, opts }); return `you said: ${prompt}`; } });
+  const app = buildApp({ generate: async (prompt, opts) => { seen.push({ prompt, opts }); return { text: `you said: ${prompt}`, model: 'gemini-flash-latest' }; } });
   beforeAll(openTestDb); beforeEach(() => { seen.length = 0; return clearTestDb(); }); afterAll(closeTestDb);
 
   test('answers a first question, and names the catalog in the system prompt', async () => {
@@ -97,6 +100,7 @@ describe('POST /api/ai/chat', () => {
     const r = await request(app).post('/api/ai/chat').send({ messages: [{ role: 'user', text: 'How do I make palak paneer?' }] });
     expect(r.status).toBe(200);
     expect(r.body.reply).toBe('you said: How do I make palak paneer?');
+    expect(r.body.model).toBe('gemini-flash-latest');
     expect(seen[0].opts?.system).toMatch(/Paneer/);
     expect(seen[0].opts?.history).toEqual([]);
   });
