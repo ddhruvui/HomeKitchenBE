@@ -4,7 +4,7 @@ import { familyOf, bridgeNeededFor } from '@home-kitchen/shared';
 import { asyncH, bad, HttpError, parse } from '../http';
 
 import { loadIngredientMap, loadRecipeMap } from '../loaders';
-import { estimateBridges, makeGeminiGenerate, ModelError, type BridgeRequest, type Generate } from '../gemini';
+import { askAboutCooking, estimateBridges, makeGeminiGenerate, ModelError, type BridgeRequest, type Generate } from '../gemini';
 import { config } from '../env';
 
 /** A model that answers badly is a 502 with a reason, never a bare 500 — and a reason already written for a person is left alone. */
@@ -43,6 +43,17 @@ export function aiRoutes(generate?: Generate) {
     const gen = generate ?? (() => { if (!config.geminiKey) throw bad('GEMINI_API_KEY is not configured; enter conversions by hand'); return makeGeminiGenerate(); })();
     const estimates = await fromModel(estimateBridges(reqs, gen));
     res.json({ estimates: estimates.map((e) => ({ ...e, name: ings[e.id]?.name })), model: config.geminiModel });
+  }));
+  /** One turn of a conversation about a dish. The browser holds the history and sends it back; nothing here is stored, and nothing reaches a recipe except by being typed in. */
+  ai.post('/chat', asyncH(async (req, res) => {
+    const { messages } = parse(z.object({
+      messages: z.array(z.object({ role: z.enum(['user', 'model']), text: z.string().trim().min(1).max(4000) })).min(1).max(40),
+    }), req.body ?? {});
+    if (messages[messages.length - 1].role !== 'user') throw bad('the last message has to be yours');
+    const gen = generate ?? (() => { if (!config.geminiKey) throw bad('GEMINI_API_KEY is not configured'); return makeGeminiGenerate(); })();
+    const catalog = Object.values(await loadIngredientMap()).map((i) => i.name).sort();
+    const reply = await fromModel(askAboutCooking(messages, catalog, gen));
+    res.json({ reply, model: config.geminiModel });
   }));
   return ai;
 }

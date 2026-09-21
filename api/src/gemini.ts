@@ -1,17 +1,26 @@
 import { z } from 'zod';
 import { GoogleGenAI, type GenerateContentConfig, type ThinkingLevel } from '@google/genai';
 import { config } from './env';
+import { ALL_UNITS } from '@home-kitchen/shared';
 
 export interface BridgeRequest { id: string; name: string; countUnit?: 'each' | 'bunch'; wantCup: boolean; wantCount: boolean; }
 export interface BridgeEstimate { id: string; ozPerCup?: number; ozPerCount?: number; rationale: string; }
 
-export interface GenerateOpts { timeoutMs?: number }
+/** One side of a conversation. The model's own turns come back from the browser, so a chat needs no server state. */
+export interface ChatTurn { role: 'user' | 'model'; text: string }
+/** `text` asks for prose rather than JSON; `history` and `system` are what make a call a conversation rather than a question. */
+export interface GenerateOpts { timeoutMs?: number; history?: ChatTurn[]; system?: string; text?: boolean }
 /** The one function that knows a model exists. Injected so tests never call the network. */
 export type Generate = (prompt: string, opts?: GenerateOpts) => Promise<string>;
 
 /** An error whose message is already a sentence for the person reading it, so callers pass it through instead of wrapping it. */
 export class ModelError extends Error {
   constructor(message: string) { super(message); this.name = 'ModelError'; }
+}
+/** A lone prompt goes as a string; a conversation goes as the turns so far plus this one. */
+function asContents(prompt: string, history?: ChatTurn[]) {
+  if (!history?.length) return prompt;
+  return [...history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })), { role: 'user', parts: [{ text: prompt }] }];
 }
 const statusOf = (e: unknown) => (e as { status?: number })?.status;
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -30,9 +39,12 @@ export function makeGeminiGenerate(apiKey = config.geminiKey, model = config.gem
     const deadline = Date.now() + budget;                      // one budget for the whole call, retries included
     for (let attempt = 0; attempt < 3 && Date.now() < deadline; attempt++) {
       try {
-        const cfg: GenerateContentConfig = { responseMimeType: 'application/json', temperature: 0.1, abortSignal: AbortSignal.timeout(deadline - Date.now()) };
+        // A structured answer wants to be repeatable; a conversation that repeats itself on a follow-up is a worse conversation.
+        const cfg: GenerateContentConfig = { temperature: opts.text ? 0.4 : 0.1, abortSignal: AbortSignal.timeout(deadline - Date.now()) };
+        if (!opts.text) cfg.responseMimeType = 'application/json';
+        if (opts.system) cfg.systemInstruction = opts.system;
         if (thinking) cfg.thinkingConfig = { thinkingLevel: thinking as ThinkingLevel };
-        const res = await ai.models.generateContent({ model, contents: prompt, config: cfg });
+        const res = await ai.models.generateContent({ model, contents: asContents(prompt, opts.history), config: cfg });
         return res.text ?? '';
       } catch (e) {
         lastErr = e;
@@ -112,4 +124,28 @@ export async function estimateBridges(reqs: BridgeRequest[], generate: Generate)
   if (!parsed.success) throw new Error('model response did not match the expected shape');
   const wanted = new Set(reqs.map((r) => r.id));
   return parsed.data.filter((e) => wanted.has(e.id)).map(sanitize).filter((e): e is BridgeEstimate => e !== null);
+}
+
+// ---------------- Asking about a dish (§3 "Asking the model about a dish") ----------------
+
+/** What the model needs to answer in the house's own vocabulary, so a reply can be typed straight into the editor. */
+export function chatSystemPrompt(catalog: string[]): string {
+  return [
+    'You are helping plan and cook for a two-person household. Answer in plain prose and short lists. Never JSON, never a code fence.',
+    'House conventions, so an answer can be typed straight into the recipe editor:',
+    '- Amounts are for TWO people, one meal. Rescale anything from another source and say that you did.',
+    `- US customary units only: ${ALL_UNITS.join(', ')} (floz means fluid ounces). Never metric.`,
+    '- Give every ingredient a number, spices, salt and oil included. "To taste" is no use to a shopping list.',
+    '- Name each ingredient the way a US supermarket or an Indian grocer labels it. One ingredient per line.',
+    ...(catalog.length ? ['- These are already in the catalog. When you mean one of them, use its exact name:', `  ${catalog.join(', ')}`] : []),
+    'Keep answers short. Expect follow-up questions and answer them in the same style.',
+  ].join('\n');
+}
+
+/** One turn of the conversation. The whole history arrives from the browser each time; nothing is stored here. */
+export async function askAboutCooking(turns: ChatTurn[], catalog: string[], generate: Generate): Promise<string> {
+  const last = turns[turns.length - 1];
+  const reply = (await generate(last.text, { history: turns.slice(0, -1), system: chatSystemPrompt(catalog), text: true })).trim();
+  if (!reply) throw new ModelError('The model came back with nothing to say — ask again, or put it differently.');
+  return reply.slice(0, 8000);
 }

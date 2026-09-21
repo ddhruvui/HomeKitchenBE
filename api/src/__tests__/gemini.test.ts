@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { buildApp } from '../app';
-import { buildPrompt, estimateBridges, sanitize } from '../gemini';
+import { askAboutCooking, buildPrompt, chatSystemPrompt, estimateBridges, sanitize } from '../gemini';
+import type { ChatTurn, GenerateOpts } from '../gemini';
 import { clearTestDb, closeTestDb, openTestDb } from './testDb';
 
 describe('sanitize', () => {
@@ -53,5 +54,70 @@ describe('POST /api/ai/bridges', () => {
   test('nothing to estimate means no model call', async () => {
     const r = await request(app).post('/api/ai/bridges').send({});
     expect(r.body.estimates).toEqual([]); expect(seen).toHaveLength(0);
+  });
+});
+
+describe('asking about a dish', () => {
+  const turns: ChatTurn[] = [
+    { role: 'user', text: 'How do I make pav bhaji?' },
+    { role: 'model', text: 'Boil the potatoes.' },
+    { role: 'user', text: 'Can I skip the capsicum?' },
+  ];
+
+  test('the follow-up is the prompt and everything before it is the history', async () => {
+    let seen: { prompt: string; opts?: GenerateOpts } | null = null;
+    const reply = await askAboutCooking(turns, ['Potato'], async (prompt, opts) => { seen = { prompt, opts }; return '  Yes, use extra potato.  '; });
+    expect(reply).toBe('Yes, use extra potato.');
+    expect(seen!.prompt).toBe('Can I skip the capsicum?');
+    expect(seen!.opts?.history).toEqual(turns.slice(0, 2));
+    expect(seen!.opts?.text).toBe(true);
+    expect(seen!.opts?.system).toMatch(/Potato/);
+  });
+
+  test('an empty answer is an error, not an empty bubble', async () => {
+    await expect(askAboutCooking(turns, [], async () => '   ')).rejects.toThrow(/nothing to say/);
+  });
+
+  test('the prompt carries the house conventions and the catalog', () => {
+    const p = chatSystemPrompt(['Toor Dal', 'Yellow Onion']);
+    expect(p).toMatch(/TWO people/); expect(p).toMatch(/Never metric/);
+    expect(p).toMatch(/Toor Dal, Yellow Onion/);
+    expect(chatSystemPrompt([])).not.toMatch(/already in the catalog/);
+  });
+});
+
+describe('POST /api/ai/chat', () => {
+  const seen: Array<{ prompt: string; opts?: GenerateOpts }> = [];
+  const app = buildApp({ generate: async (prompt, opts) => { seen.push({ prompt, opts }); return `you said: ${prompt}`; } });
+  beforeAll(openTestDb); beforeEach(() => { seen.length = 0; return clearTestDb(); }); afterAll(closeTestDb);
+
+  test('answers a first question, and names the catalog in the system prompt', async () => {
+    const s = (await request(app).post('/api/stores').send({ name: 'Costco' })).body;
+    await request(app).post('/api/ingredients').send({ name: 'Paneer', kind: 'fresh', storeId: s.id, form: 'Dairy', buyUnit: 'lb' });
+    const r = await request(app).post('/api/ai/chat').send({ messages: [{ role: 'user', text: 'How do I make palak paneer?' }] });
+    expect(r.status).toBe(200);
+    expect(r.body.reply).toBe('you said: How do I make palak paneer?');
+    expect(seen[0].opts?.system).toMatch(/Paneer/);
+    expect(seen[0].opts?.history).toEqual([]);
+  });
+
+  test('a follow-up carries the turns before it', async () => {
+    const messages = [{ role: 'user', text: 'Pav bhaji?' }, { role: 'model', text: 'Boil.' }, { role: 'user', text: 'For four?' }];
+    const r = await request(app).post('/api/ai/chat').send({ messages });
+    expect(r.status).toBe(200);
+    expect(seen[0].prompt).toBe('For four?');
+    expect(seen[0].opts?.history).toHaveLength(2);
+  });
+
+  test('nothing is written to the catalog', async () => {
+    await request(app).post('/api/ai/chat').send({ messages: [{ role: 'user', text: 'Invent an ingredient' }] }).expect(200);
+    expect((await request(app).get('/api/ingredients')).body).toEqual([]);
+  });
+
+  test('an empty conversation, and one ending on the model, are both 400', async () => {
+    await request(app).post('/api/ai/chat').send({ messages: [] }).expect(400);
+    const r = await request(app).post('/api/ai/chat').send({ messages: [{ role: 'model', text: 'hi' }] });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toMatch(/has to be yours/);
   });
 });
