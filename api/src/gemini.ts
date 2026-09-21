@@ -27,6 +27,31 @@ const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** Not every model accepts every thinking level (3.8-flash rejects MINIMAL), so a refusal drops the setting rather than the call. */
 const rejectsThinking = (e: unknown) => statusOf(e) === 400 && /thinking/i.test(messageOf(e));
 
+/** Which bucket ran out, and how many it holds. The free tier caps per day as well as per minute, and the two need different advice. */
+function quotaViolation(e: unknown): { perDay: boolean; limit?: string } | null {
+  const details = (e as { details?: unknown })?.details ?? (e as { error?: { details?: unknown } })?.error?.details;
+  const list = Array.isArray(details) ? details : [];
+  for (const d of list as Array<{ violations?: Array<{ quotaId?: string; quotaValue?: string }> }>) {
+    for (const v of d.violations ?? []) {
+      if (v.quotaId) return { perDay: /PerDay/i.test(v.quotaId), limit: v.quotaValue };
+    }
+  }
+  // The SDK sometimes hands us only the serialised body, so fall back to reading the id out of the text.
+  const m = /"quotaId"\s*:\s*"([^"]+)"/.exec(messageOf(e));
+  return m ? { perDay: /PerDay/i.test(m[1]), limit: /"quotaValue"\s*:\s*"(\d+)"/.exec(messageOf(e))?.[1] } : null;
+}
+
+/** A daily cap that says "try again in 33s" is worse than no advice: the retry is guaranteed to fail and you wait for nothing. */
+function quotaError(err: unknown, msg: string, model: string): ModelError {
+  const q = quotaViolation(err);
+  if (q?.perDay) {
+    const cap = q.limit ? ` (${q.limit} a day)` : '';
+    return new ModelError(`The free Gemini quota for ${model} is used up for today${cap}. It resets at midnight Pacific — or set GEMINI_MODEL to another model, which has its own allowance.`);
+  }
+  const wait = msg.match(/retry in ([0-9.]+)s/i)?.[1];
+  return new ModelError(`The free Gemini quota for ${model} is used up for the minute — try again${wait ? ` in ${Math.ceil(Number(wait))}s` : ' shortly'}.`);
+}
+
 export function makeGeminiGenerate(apiKey = config.geminiKey, model = config.geminiModel): Generate {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
   const ai = new GoogleGenAI({ apiKey });
@@ -54,10 +79,7 @@ export function makeGeminiGenerate(apiKey = config.geminiKey, model = config.gem
       }
     }
     const msg = messageOf(lastErr);
-    if (statusOf(lastErr) === 429 || /RESOURCE_EXHAUSTED|quota/i.test(msg)) {
-      const wait = msg.match(/retry in ([0-9.]+)s/i)?.[1];
-      throw new ModelError(`The free Gemini quota for ${model} is used up for the minute — try again${wait ? ` in ${Math.ceil(Number(wait))}s` : ' shortly'}.`);
-    }
+    if (statusOf(lastErr) === 429 || /RESOURCE_EXHAUSTED|quota/i.test(msg)) throw quotaError(lastErr, msg, model);
     if (/aborted|AbortError|timed? ?out/i.test(msg)) throw new ModelError(`${model} did not answer within ${Math.round(budget / 1000)}s — try again.`);
     if (/UNAVAILABLE|high demand|503/.test(msg)) throw new ModelError('The model is busy right now — try again in a moment.');
     throw new Error(msg);

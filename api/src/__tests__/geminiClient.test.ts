@@ -39,6 +39,21 @@ describe('makeGeminiGenerate', () => {
     expect(generateContent).toHaveBeenCalledTimes(1);
   });
 
+  test('a daily cap says so, because "retry in 33s" would be a guaranteed second failure', async () => {
+    const violation = { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', quotaValue: '20' }] };
+    generateContent.mockRejectedValue(Object.assign(err(429, 'Quota exceeded. Please retry in 33s.'), { details: [violation] }));
+    const reply = makeGeminiGenerate('k', 'gemini-3.5-flash')('p');
+    await expect(reply).rejects.toThrow(/used up for today \(20 a day\)/);
+    await expect(reply).rejects.toThrow(/resets at midnight Pacific/);
+    await expect(reply).rejects.not.toThrow(/in 33s/);
+  });
+
+  test('the per-minute cap still gets the wait it was given', async () => {
+    const violation = { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', quotaValue: '10' }] };
+    generateContent.mockRejectedValue(Object.assign(err(429, 'Quota exceeded. Please retry in 16.9s.'), { details: [violation] }));
+    await expect(makeGeminiGenerate('k', 'gemini-3.5-flash')('p')).rejects.toThrow(/used up for the minute — try again in 17s\.$/);
+  });
+
   test('a hung model becomes a timeout message, not a spinner that never ends', async () => {
     generateContent.mockRejectedValue(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }));
     await expect(makeGeminiGenerate('k')('p')).rejects.toThrow(new RegExp(`did not answer within ${Math.round(config.geminiTimeoutMs / 1000)}s`));
