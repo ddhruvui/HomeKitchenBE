@@ -7,13 +7,13 @@ const stores: Store[] = [
 ];
 const ing = (i: Partial<Ingredient> & Pick<Ingredient, 'id' | 'name' | 'kind' | 'storeId' | 'form'>): Ingredient => i;
 const I: Record<string, Ingredient> = Object.fromEntries([
-  ing({ id: 'onion', name: 'Yellow Onion', kind: 'fresh', storeId: 'costco', form: 'Produce', buyUnit: 'each', stockUnit: 'each', countUnit: 'each', ozPerCup: 5.6, ozPerCount: 5.3 }),
+  ing({ id: 'onion', name: 'Yellow Onion', kind: 'fresh', storeId: 'costco', form: 'Veggies', buyUnit: 'each', stockUnit: 'each', countUnit: 'each', ozPerCup: 5.6, ozPerCount: 5.3 }),
   ing({ id: 'paneer', name: 'Paneer', kind: 'fresh', storeId: 'costco', form: 'Dairy', buyUnit: 'lb', stockUnit: 'lb' }),
-  ing({ id: 'cor', name: 'Coriander', kind: 'fresh', storeId: 'indian', form: 'Produce', buyUnit: 'bunch', stockUnit: 'bunch', countUnit: 'bunch', ozPerCount: 2.5 }),
+  ing({ id: 'cor', name: 'Coriander', kind: 'fresh', storeId: 'indian', form: 'Veggies', buyUnit: 'bunch', stockUnit: 'bunch', countUnit: 'bunch', ozPerCount: 2.5 }),
   ing({ id: 'milk', name: 'Milk', kind: 'weekly', storeId: 'costco', form: 'Dairy', weeklyQty: 2 }),
-  ing({ id: 'rice', name: 'Basmati Rice', kind: 'pantry', storeId: 'indian', form: 'Dry Goods', isLow: true }),
-  ing({ id: 'dal', name: 'Toor Dal', kind: 'pantry', storeId: 'indian', form: 'Dry Goods', isLow: false }),
-  ing({ id: 'masala', name: 'Pav Bhaji Masala', kind: 'pantry', storeId: 'indian', form: 'Spices', isLow: true }),
+  ing({ id: 'rice', name: 'Basmati Rice', kind: 'pantry', storeId: 'indian', form: 'Grains', isLow: true }),
+  ing({ id: 'dal', name: 'Toor Dal', kind: 'pantry', storeId: 'indian', form: 'Grains', isLow: false }),
+  ing({ id: 'masala', name: 'Pav Bhaji Masala', kind: 'pantry', storeId: 'indian', form: 'Masala', isLow: true }),
 ].map((x) => [x.id, x]));
 
 const R: Record<string, Recipe> = {
@@ -102,9 +102,9 @@ describe('generateList', () => {
   test('ordered by store visit order, running-low first inside a store, then aisle', () => {
     const out = generateList(base({ freshStock: [] }));
     const order = out.items.map((i) => i.storeId + ':' + i.group + ':' + i.name);
-    expect(order.indexOf('costco:Produce:Yellow Onion')).toBeLessThan(order.indexOf('indian:Running low:Basmati Rice'));
-    expect(order.indexOf('indian:Running low:Basmati Rice')).toBeLessThan(order.indexOf('indian:Produce:Coriander'));
-    expect(order.indexOf('costco:Produce:Yellow Onion')).toBeLessThan(order.indexOf('costco:Dairy:Milk'));
+    expect(order.indexOf('costco:Veggies:Yellow Onion')).toBeLessThan(order.indexOf('indian:Running low:Basmati Rice'));
+    expect(order.indexOf('indian:Running low:Basmati Rice')).toBeLessThan(order.indexOf('indian:Veggies:Coriander'));
+    expect(order.indexOf('costco:Veggies:Yellow Onion')).toBeLessThan(order.indexOf('costco:Dairy:Milk'));
   });
 
   test('a weight-bought ingredient sums in ounces and cross-checks in count', () => {
@@ -136,11 +136,11 @@ describe('pantry check', () => {
 describe('mergeLists', () => {
   test('keeps ticks for items still present and carries manual items forward', () => {
     const old = [
-      { ingredientId: 'onion', name: 'Yellow Onion', storeId: 'costco', group: 'Produce', source: 'auto' as const, checked: true },
-      { ingredientId: 'gone', name: 'Gone', storeId: 'costco', group: 'Produce', source: 'auto' as const, checked: true },
-      { ingredientId: 'candles', name: 'Birthday candles', storeId: 'costco', group: 'Bakery', source: 'manual' as const, checked: false },
+      { ingredientId: 'onion', name: 'Yellow Onion', storeId: 'costco', group: 'Veggies', source: 'auto' as const, checked: true },
+      { ingredientId: 'gone', name: 'Gone', storeId: 'costco', group: 'Veggies', source: 'auto' as const, checked: true },
+      { ingredientId: 'candles', name: 'Birthday candles', storeId: 'costco', group: 'Grains', source: 'manual' as const, checked: false },
     ];
-    const fresh = [{ ingredientId: 'onion', name: 'Yellow Onion', storeId: 'costco', group: 'Produce', source: 'auto' as const, checked: false, buyQty: 1 }];
+    const fresh = [{ ingredientId: 'onion', name: 'Yellow Onion', storeId: 'costco', group: 'Veggies', source: 'auto' as const, checked: false, buyQty: 1 }];
     const m = mergeLists(old, fresh);
     expect(m.find((i) => i.ingredientId === 'onion')).toMatchObject({ checked: true, buyQty: 1 });
     expect(m.find((i) => i.ingredientId === 'gone')).toBeUndefined();

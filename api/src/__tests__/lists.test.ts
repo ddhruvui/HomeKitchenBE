@@ -9,11 +9,11 @@ async function seed() {
   const costco = (await request(app).post('/api/stores').send({ name: 'Costco', sortOrder: 0 })).body;
   const indian = (await request(app).post('/api/stores').send({ name: 'Indian Store', sortOrder: 1 })).body;
   const mk = async (b: Record<string, unknown>) => (await request(app).post('/api/ingredients').send(b)).body;
-  const onion = await mk({ name: 'Yellow Onion', kind: 'fresh', storeId: costco.id, form: 'Produce', buyUnit: 'each', countUnit: 'each', ozPerCup: 5.6, ozPerCount: 5.3 });
+  const onion = await mk({ name: 'Yellow Onion', kind: 'fresh', storeId: costco.id, form: 'Veggies', buyUnit: 'each', countUnit: 'each', ozPerCup: 5.6, ozPerCount: 5.3 });
   const paneer = await mk({ name: 'Paneer', kind: 'fresh', storeId: costco.id, form: 'Dairy', buyUnit: 'lb' });
   const milk = await mk({ name: 'Milk', kind: 'weekly', storeId: costco.id, form: 'Dairy', weeklyQty: 2 });
-  const rice = await mk({ name: 'Basmati Rice', kind: 'pantry', storeId: indian.id, form: 'Dry Goods' });
-  const spinach = await mk({ name: 'Spinach', kind: 'fresh', storeId: indian.id, form: 'Produce', buyUnit: 'bunch', countUnit: 'bunch' });
+  const rice = await mk({ name: 'Basmati Rice', kind: 'pantry', storeId: indian.id, form: 'Grains' });
+  const spinach = await mk({ name: 'Spinach', kind: 'fresh', storeId: indian.id, form: 'Veggies', buyUnit: 'bunch', countUnit: 'bunch' });
   const pav = (await request(app).post('/api/recipes').send({ title: 'Pav Bhaji', ingredients: [{ ingredientId: onion.id, qty: 1, unit: 'cup' }, { ingredientId: rice.id, qty: 1, unit: 'cup' }] })).body;
   const palak = (await request(app).post('/api/recipes').send({ title: 'Palak Paneer', ingredients: [{ ingredientId: paneer.id, qty: 8, unit: 'oz' }, { ingredientId: spinach.id, qty: 1, unit: 'cup' }] })).body;
   await request(app).put('/api/plan/2026-09-05').send({ dinner: [pav.id] });

@@ -18,7 +18,7 @@ const mark = (date: string, body: Record<string, unknown> = {}) => request(app).
 async function seed() {
   const store = (await request(app).post('/api/stores').send({ name: 'Costco' })).body;
   const mkIng = async (b: Record<string, unknown>) => (await request(app).post('/api/ingredients').send({ storeId: store.id, ...b })).body;
-  const potato = await mkIng({ name: 'Potato', kind: 'fresh', form: 'Produce', buyUnit: 'lb' });
+  const potato = await mkIng({ name: 'Potato', kind: 'fresh', form: 'Veggies', buyUnit: 'lb' });
   const paneer = await mkIng({ name: 'Paneer', kind: 'fresh', form: 'Dairy', buyUnit: 'lb' });
   const mkRec = async (title: string, ingredients: unknown[]) => (await request(app).post('/api/recipes').send({ title, ingredients })).body;
   const palak = await mkRec('Palak Paneer', [{ ingredientId: paneer.id, qty: 8, unit: 'oz' }]);

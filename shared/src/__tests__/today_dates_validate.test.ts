@@ -3,9 +3,9 @@ import { addDays, weekStartFor, daysInRange, isValidDate, expiryStatus, daysBetw
 import { validateRecipeLine, bridgeNeededFor } from '../validate';
 import type { Ingredient, Recipe } from '../types';
 
-const onion: Ingredient = { id: 'onion', name: 'Yellow Onion', kind: 'fresh', storeId: 's', form: 'Produce', buyUnit: 'each', countUnit: 'each', ozPerCount: 5.3 };
-const cor: Ingredient = { id: 'cor', name: 'Coriander', kind: 'fresh', storeId: 's', form: 'Produce', buyUnit: 'bunch', countUnit: 'bunch', ozPerCount: 2.5 };
-const masala: Ingredient = { id: 'm', name: 'Masala', kind: 'pantry', storeId: 's', form: 'Spices' };
+const onion: Ingredient = { id: 'onion', name: 'Yellow Onion', kind: 'fresh', storeId: 's', form: 'Veggies', buyUnit: 'each', countUnit: 'each', ozPerCount: 5.3 };
+const cor: Ingredient = { id: 'cor', name: 'Coriander', kind: 'fresh', storeId: 's', form: 'Veggies', buyUnit: 'bunch', countUnit: 'bunch', ozPerCount: 2.5 };
+const masala: Ingredient = { id: 'm', name: 'Masala', kind: 'pantry', storeId: 's', form: 'Masala' };
 
 describe('todayView', () => {
   const pav: Recipe = { id: 'pav', title: 'Pav Bhaji', tags: [], steps: ['Boil potatoes.', 'Mash.'],

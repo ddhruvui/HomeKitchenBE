@@ -7,9 +7,9 @@ beforeAll(openTestDb); beforeEach(clearTestDb); afterAll(closeTestDb);
 
 async function seed() {
   const s = (await request(app).post('/api/stores').send({ name: 'Costco' })).body;
-  const onion = (await request(app).post('/api/ingredients').send({ name: 'Onion', kind: 'fresh', storeId: s.id, form: 'Produce', buyUnit: 'each', countUnit: 'each' })).body;
-  const cor = (await request(app).post('/api/ingredients').send({ name: 'Coriander', kind: 'fresh', storeId: s.id, form: 'Produce', buyUnit: 'bunch', countUnit: 'bunch' })).body;
-  const masala = (await request(app).post('/api/ingredients').send({ name: 'Masala', kind: 'pantry', storeId: s.id, form: 'Spices' })).body;
+  const onion = (await request(app).post('/api/ingredients').send({ name: 'Onion', kind: 'fresh', storeId: s.id, form: 'Veggies', buyUnit: 'each', countUnit: 'each' })).body;
+  const cor = (await request(app).post('/api/ingredients').send({ name: 'Coriander', kind: 'fresh', storeId: s.id, form: 'Veggies', buyUnit: 'bunch', countUnit: 'bunch' })).body;
+  const masala = (await request(app).post('/api/ingredients').send({ name: 'Masala', kind: 'pantry', storeId: s.id, form: 'Masala' })).body;
   return { s, onion, cor, masala };
 }
 

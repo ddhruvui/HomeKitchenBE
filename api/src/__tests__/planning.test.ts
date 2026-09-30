@@ -7,7 +7,7 @@ beforeAll(openTestDb); beforeEach(clearTestDb); afterAll(closeTestDb);
 
 async function seed() {
   const s = (await request(app).post('/api/stores').send({ name: 'Costco' })).body;
-  const onion = (await request(app).post('/api/ingredients').send({ name: 'Onion', kind: 'fresh', storeId: s.id, form: 'Produce', buyUnit: 'each', countUnit: 'each', ozPerCup: 5.6, ozPerCount: 5.3 })).body;
+  const onion = (await request(app).post('/api/ingredients').send({ name: 'Onion', kind: 'fresh', storeId: s.id, form: 'Veggies', buyUnit: 'each', countUnit: 'each', ozPerCup: 5.6, ozPerCount: 5.3 })).body;
   const pav = (await request(app).post('/api/recipes').send({ title: 'Pav Bhaji', steps: ['Boil.'], ingredients: [{ ingredientId: onion.id, qty: 1, unit: 'cup' }] })).body;
   const poha = (await request(app).post('/api/recipes').send({ title: 'Poha', ingredients: [{ ingredientId: onion.id, qty: 1, unit: 'each' }] })).body;
   const kadhi = (await request(app).post('/api/recipes').send({ title: 'Kadhi', ingredients: [] })).body;

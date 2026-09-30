@@ -45,7 +45,7 @@ describe('POST /api/ai/bridges', () => {
 
   test('asks about the ingredients recipes cannot convert, returns suggestions, writes nothing', async () => {
     const s = (await request(app).post('/api/stores').send({ name: 'Costco' })).body;
-    const onion = (await request(app).post('/api/ingredients').send({ name: 'Onion', kind: 'fresh', storeId: s.id, form: 'Produce', buyUnit: 'each', countUnit: 'each', ozPerCount: 5.3 })).body;
+    const onion = (await request(app).post('/api/ingredients').send({ name: 'Onion', kind: 'fresh', storeId: s.id, form: 'Veggies', buyUnit: 'each', countUnit: 'each', ozPerCount: 5.3 })).body;
     await request(app).post('/api/recipes').send({ title: 'Pav Bhaji', ingredients: [{ ingredientId: onion.id, qty: 1, unit: 'cup' }] });
     const r = await request(app).post('/api/ai/bridges').send({});
     expect(r.status).toBe(200);
