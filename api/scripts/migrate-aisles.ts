@@ -5,7 +5,7 @@
 import { connectDb, currentDbName, disconnectDb } from '../src/db';
 import { IngredientModel, ShoppingListModel } from '../src/models';
 
-const RENAME: Record<string, string> = { Produce: 'Veggies', 'Dry Goods': 'Grains', Bakery: 'Grains', Spices: 'Masala', Liquid: 'Condiments' };
+const RENAME: Record<string, string> = { Produce: 'Veggies', 'Dry Goods': 'Grains', Bakery: 'Grains', Spices: 'Masala', Liquid: 'Canned', Condiments: 'Canned' };
 
 (async () => {
   await connectDb();

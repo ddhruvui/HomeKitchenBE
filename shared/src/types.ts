@@ -5,7 +5,7 @@ export type Unit = WeightUnit | VolumeUnit | CountUnit;
 export type UnitFamily = 'weight' | 'volume' | 'count';
 
 export type IngredientKind = 'fresh' | 'weekly' | 'pantry';
-export const FORMS = ['Veggies', 'Fruits', 'Dairy', 'Frozen', 'Grains', 'Canned', 'Masala', 'Condiments'] as const;
+export const FORMS = ['Veggies', 'Fruits', 'Dairy', 'Frozen', 'Grains', 'Canned', 'Masala'] as const;
 export type Form = (typeof FORMS)[number];
 
 export interface Store { id: string; name: string; sortOrder: number; color: string; }

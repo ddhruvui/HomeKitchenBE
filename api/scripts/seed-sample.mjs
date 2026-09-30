@@ -18,7 +18,7 @@ await mk({ name: 'Spinach', kind: 'fresh', storeId: stores.ShopRite, form: 'Vegg
 await mk({ name: 'Green Peas', kind: 'fresh', storeId: stores.Walmart, form: 'Frozen', buyUnit: 'lb', ozPerCup: 5.1 });
 await mk({ name: 'Milk', kind: 'weekly', storeId: stores.Costco, form: 'Dairy', weeklyQty: 2 });
 await mk({ name: 'Eggs', kind: 'weekly', storeId: stores.Walmart, form: 'Dairy', weeklyQty: 1 });
-for (const [name, store, form] of [['Basmati Rice', 'Indian Store', 'Grains'], ['Toor Dal', 'Indian Store', 'Grains'], ['Turmeric Powder', 'Indian Store', 'Masala'], ['Pav Bhaji Masala', 'Indian Store', 'Masala'], ['Ginger Garlic Paste', 'Indian Store', 'Masala'], ['Butter', 'Costco', 'Dairy'], ['Cooking Oil', 'Walmart', 'Condiments'], ['Salt', 'Walmart', 'Grains']]) await mk({ name, kind: 'pantry', storeId: stores[store], form });
+for (const [name, store, form] of [['Basmati Rice', 'Indian Store', 'Grains'], ['Toor Dal', 'Indian Store', 'Grains'], ['Turmeric Powder', 'Indian Store', 'Masala'], ['Pav Bhaji Masala', 'Indian Store', 'Masala'], ['Ginger Garlic Paste', 'Indian Store', 'Masala'], ['Butter', 'Costco', 'Dairy'], ['Cooking Oil', 'Walmart', 'Canned'], ['Salt', 'Walmart', 'Grains']]) await mk({ name, kind: 'pantry', storeId: stores[store], form });
 for (const n of ['Basmati Rice', 'Turmeric Powder', 'Pav Bhaji Masala']) await j(`/api/ingredients/${ing[n]}/low`, 'PATCH', { isLow: true });
 const rec = {};
 const R = async (title, lines, steps) => { rec[title] = (await j('/api/recipes', 'POST', { title, tags: ['veg'], steps, ingredients: lines.map(([n, qty, unit, note]) => ({ ingredientId: ing[n], ...(qty ? { qty, unit } : {}), ...(note ? { note } : {}) })) })).id; };
