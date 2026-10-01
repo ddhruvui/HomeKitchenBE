@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { GoogleGenAI, type GenerateContentConfig, type ThinkingLevel } from '@google/genai';
 import { config } from './env';
-import { ALL_UNITS } from '@home-kitchen/shared';
+import { ALL_UNITS, type CountUnit } from '@home-kitchen/shared';
 
-export interface BridgeRequest { id: string; name: string; countUnit?: 'each' | 'bunch'; wantCup: boolean; wantCount: boolean; }
+export interface BridgeRequest { id: string; name: string; countUnit?: CountUnit; wantCup: boolean; wantCount: boolean; }
 export interface BridgeEstimate { id: string; ozPerCup?: number; ozPerCount?: number; rationale: string; }
 
 /** One side of a conversation. The model's own turns come back from the browser, so a chat needs no server state. */

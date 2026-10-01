@@ -1,6 +1,6 @@
 export type WeightUnit = 'oz' | 'lb';
 export type VolumeUnit = 'tsp' | 'tbsp' | 'floz' | 'cup' | 'pint' | 'quart' | 'gallon';
-export type CountUnit = 'each' | 'bunch';
+export type CountUnit = 'each' | 'bunch' | 'clove';
 export type Unit = WeightUnit | VolumeUnit | CountUnit;
 export type UnitFamily = 'weight' | 'volume' | 'count';
 

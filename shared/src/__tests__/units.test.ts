@@ -34,6 +34,9 @@ describe('crossing families through the bridges', () => {
   test('count against the wrong count unit is a mismatch', () => {
     expect(() => convert(1, 'bunch', 'oz', { ozPerCount: 2.5, countUnit: 'each' })).toThrow(UnitMismatchError);
   });
+  test('garlic cloves become pounds through ozPerCount', () => {
+    expect(round(convert(8, 'clove', 'lb', { ozPerCount: 0.2, countUnit: 'clove' }), 2)).toBe(0.1);
+  });
   test('zero or negative bridge counts as missing', () => { expect(() => convert(1, 'cup', 'oz', { ozPerCup: 0 })).toThrow(MissingBridgeError); });
 });
 

@@ -2,14 +2,14 @@ import type { Unit, UnitFamily, WeightUnit, VolumeUnit, CountUnit } from './type
 
 export const WEIGHT_UNITS: readonly WeightUnit[] = ['oz', 'lb'];
 export const VOLUME_UNITS: readonly VolumeUnit[] = ['tsp', 'tbsp', 'floz', 'cup', 'pint', 'quart', 'gallon'];
-export const COUNT_UNITS: readonly CountUnit[] = ['each', 'bunch'];
+export const COUNT_UNITS: readonly CountUnit[] = ['each', 'bunch', 'clove'];
 export const ALL_UNITS: readonly Unit[] = [...WEIGHT_UNITS, ...VOLUME_UNITS, ...COUNT_UNITS];
 
 const TO_OZ: Record<WeightUnit, number> = { oz: 1, lb: 16 };
 const TO_FLOZ: Record<VolumeUnit, number> = { tsp: 1 / 6, tbsp: 0.5, floz: 1, cup: 8, pint: 16, quart: 32, gallon: 128 };
 
 export const UNIT_LABEL: Record<Unit, string> = {
-  oz: 'oz', lb: 'lb', tsp: 'tsp', tbsp: 'tbsp', floz: 'fl oz', cup: 'cup', pint: 'pint', quart: 'qt', gallon: 'gal', each: 'each', bunch: 'bunch',
+  oz: 'oz', lb: 'lb', tsp: 'tsp', tbsp: 'tbsp', floz: 'fl oz', cup: 'cup', pint: 'pint', quart: 'qt', gallon: 'gal', each: 'each', bunch: 'bunch', clove: 'clove',
 };
 
 export function isUnit(u: unknown): u is Unit { return typeof u === 'string' && (ALL_UNITS as readonly string[]).includes(u); }
