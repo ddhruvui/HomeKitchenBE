@@ -31,7 +31,7 @@ export interface Ingredient {
 }
 
 export interface RecipeLine { ingredientId: string; qty?: number; unit?: Unit; note?: string; }
-export interface Recipe { id: string; title: string; ingredients: RecipeLine[]; /** Tasks hours ahead of cooking — soak, thaw, set curd. */ morningSteps: string[]; /** The evening's cooking. */ steps: string[]; tags: string[]; }
+export interface Recipe { id: string; title: string; ingredients: RecipeLine[]; /** Tasks hours ahead of cooking — soak, thaw, set curd. */ morningSteps: string[]; /** The evening's cooking. */ steps: string[]; tags: string[]; /** Where the recipe came from — links or plain notes ("Mom's notebook"), for reference only. */ sources: string[]; }
 
 /** date is YYYY-MM-DD. Lunch is never stored; it is the previous day's dinner. */
 export interface PlannedDay { date: string; breakfast: string[]; dinner: string[]; }

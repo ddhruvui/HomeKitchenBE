@@ -25,6 +25,15 @@ describe('recipes', () => {
     expect(r.body.steps).toHaveLength(2);
     expect(r.body.ingredients[1]).toMatchObject({ qty: 2, unit: 'tbsp' });
   });
+  test('sources are saved, and a PUT that leaves them out keeps them', async () => {
+    await seed();
+    const r = await request(app).post('/api/recipes').send({ title: 'Pav Bhaji', sources: ['https://example.com/pav-bhaji', "Mom's notebook"] });
+    expect(r.body.sources).toEqual(['https://example.com/pav-bhaji', "Mom's notebook"]);
+    const u = await request(app).put(`/api/recipes/${r.body.id}`).send({ title: 'Pav Bhaji', steps: ['Mash.'] });
+    expect(u.body.sources).toHaveLength(2);
+    const cleared = await request(app).put(`/api/recipes/${r.body.id}`).send({ title: 'Pav Bhaji', sources: [] });
+    expect(cleared.body.sources).toEqual([]);
+  });
   test('a count unit that is not the ingredient\'s own is rejected at save time', async () => {
     const { onion, cor } = await seed();
     const r = await request(app).post('/api/recipes').send({ title: 'Bad', ingredients: [{ ingredientId: onion.id, qty: 2, unit: 'bunch' }, { ingredientId: cor.id, qty: 0.5, unit: 'bunch' }] });

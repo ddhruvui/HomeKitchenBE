@@ -14,7 +14,7 @@ export function toIngredient(d: Record<string, unknown>): Ingredient {
 export function toRecipe(d: Record<string, unknown>): Recipe {
   const lines = (d.ingredients as Array<Record<string, unknown>>) ?? [];
   return {
-    id: s(d._id ?? d.id), title: d.title as string, morningSteps: (d.morningSteps as string[]) ?? [], steps: (d.steps as string[]) ?? [], tags: (d.tags as string[]) ?? [],
+    id: s(d._id ?? d.id), title: d.title as string, morningSteps: (d.morningSteps as string[]) ?? [], steps: (d.steps as string[]) ?? [], tags: (d.tags as string[]) ?? [], sources: (d.sources as string[]) ?? [],
     ingredients: lines.map((l) => ({ ingredientId: s(l.ingredientId), ...(l.qty != null ? { qty: l.qty as number } : {}), ...(l.unit ? { unit: l.unit as Recipe['ingredients'][number]['unit'] } : {}), ...(l.note ? { note: l.note as string } : {}) })),
   };
 }

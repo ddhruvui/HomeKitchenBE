@@ -52,6 +52,7 @@ const RecipeSchema = new Schema({
   morningSteps: { type: [String], default: [] },
   steps: { type: [String], default: [] },
   tags: { type: [String], default: [] },
+  sources: { type: [String], default: [] },
 }, opts);
 
 const PlannedDaySchema = new Schema({
