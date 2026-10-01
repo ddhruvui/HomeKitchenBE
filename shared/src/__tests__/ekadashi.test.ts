@@ -42,9 +42,9 @@ describe('cookedOn and cookAheadDate', () => {
 
 describe('todayView with fasts', () => {
   const onion: Ingredient = { id: 'onion', name: 'Yellow Onion', kind: 'fresh', storeId: 's', form: 'Veggies', buyUnit: 'each', countUnit: 'each', ozPerCount: 5.3 };
-  const palak: Recipe = { id: 'palak', title: 'Palak Paneer', tags: [], steps: ['Blanch.'], ingredients: [{ ingredientId: 'onion', qty: 1, unit: 'cup' }] };
-  const bateta: Recipe = { id: 'bateta', title: 'Bateta Bhaji', tags: [], steps: ['Boil.'], ingredients: [{ ingredientId: 'onion', qty: 2, unit: 'cup' }] };
-  const thepla: Recipe = { id: 'thepla', title: 'Thepla', tags: [], steps: [], ingredients: [{ ingredientId: 'onion', qty: 0.5, unit: 'cup' }] };
+  const palak: Recipe = { id: 'palak', title: 'Palak Paneer', tags: [], morningSteps: [], steps: ['Blanch.'], ingredients: [{ ingredientId: 'onion', qty: 1, unit: 'cup' }] };
+  const bateta: Recipe = { id: 'bateta', title: 'Bateta Bhaji', tags: [], morningSteps: [], steps: ['Boil.'], ingredients: [{ ingredientId: 'onion', qty: 2, unit: 'cup' }] };
+  const thepla: Recipe = { id: 'thepla', title: 'Thepla', tags: [], morningSteps: [], steps: [], ingredients: [{ ingredientId: 'onion', qty: 0.5, unit: 'cup' }] };
   const R = { palak, bateta, thepla };
   const I = { onion };
   const days: PlannedDay[] = [

@@ -8,9 +8,9 @@ const cor: Ingredient = { id: 'cor', name: 'Coriander', kind: 'fresh', storeId: 
 const masala: Ingredient = { id: 'm', name: 'Masala', kind: 'pantry', storeId: 's', form: 'Masala' };
 
 describe('todayView', () => {
-  const pav: Recipe = { id: 'pav', title: 'Pav Bhaji', tags: [], steps: ['Boil potatoes.', 'Mash.'],
+  const pav: Recipe = { id: 'pav', title: 'Pav Bhaji', tags: [], morningSteps: ['Soak the peas.'], steps: ['Boil potatoes.', 'Mash.'],
     ingredients: [{ ingredientId: 'onion', qty: 1, unit: 'cup', note: 'chopped' }, { ingredientId: 'm', qty: 2, unit: 'tbsp' }] };
-  const thepla: Recipe = { id: 't', title: 'Thepla', tags: [], steps: [], ingredients: [{ ingredientId: 'onion', qty: 0.5, unit: 'cup' }] };
+  const thepla: Recipe = { id: 't', title: 'Thepla', tags: [], morningSteps: [], steps: [], ingredients: [{ ingredientId: 'onion', qty: 0.5, unit: 'cup' }] };
   const R = { pav, t: thepla };
   const I = { onion, m: masala };
 
@@ -20,6 +20,7 @@ describe('todayView', () => {
     expect(v.breakfast[0].lines[0].qty).toBe(0.5);
     expect(v.dinner[0].lines[0]).toMatchObject({ qty: 2, unit: 'cup', note: 'chopped' });
     expect(v.dinner[0].lines[1]).toMatchObject({ name: 'Masala', qty: 4, unit: 'tbsp' });
+    expect(v.dinner[0].morningSteps).toEqual(['Soak the peas.']);
     expect(v.dinner[0].steps).toEqual(['Boil potatoes.', 'Mash.']);
     expect(v.lunch).toEqual(['Pav Bhaji']); expect(v.lunchFrom).toBe('2026-09-05'); expect(v).toMatchObject({ isEkadashi: false, dinnerCookedOn: '2026-09-06', cookAhead: null });
   });

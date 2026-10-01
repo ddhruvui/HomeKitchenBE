@@ -4,7 +4,7 @@ import { round } from './units';
 import { cookAheadDate, cookedOn, lunchSourceDate } from './ekadashi';
 
 export interface ScaledLine { ingredientId: string; name: string; qty?: number; unit?: Unit; note?: string; }
-export interface ScaledRecipe { recipeId: string; title: string; factor: number; lines: ScaledLine[]; steps: string[]; }
+export interface ScaledRecipe { recipeId: string; title: string; factor: number; lines: ScaledLine[]; morningSteps: string[]; steps: string[]; }
 
 export interface TodayInput {
   date: string;
@@ -34,7 +34,7 @@ function scaleRecipe(r: Recipe, factor: number, ingredients: Record<string, Ingr
       qty: l.qty === undefined ? undefined : round(l.qty * factor),
       unit: l.unit, note: l.note,
     })),
-    steps: r.steps,
+    morningSteps: r.morningSteps ?? [], steps: r.steps,
   };
 }
 

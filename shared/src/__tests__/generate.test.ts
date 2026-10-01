@@ -17,11 +17,11 @@ const I: Record<string, Ingredient> = Object.fromEntries([
 ].map((x) => [x.id, x]));
 
 const R: Record<string, Recipe> = {
-  pav: { id: 'pav', title: 'Pav Bhaji', tags: [], steps: [],
+  pav: { id: 'pav', title: 'Pav Bhaji', tags: [], morningSteps: [], steps: [],
     ingredients: [{ ingredientId: 'onion', qty: 1, unit: 'cup' }, { ingredientId: 'masala', qty: 2, unit: 'tbsp' }, { ingredientId: 'cor', qty: 0.5, unit: 'bunch' }] },
-  palak: { id: 'palak', title: 'Palak Paneer', tags: [], steps: [],
+  palak: { id: 'palak', title: 'Palak Paneer', tags: [], morningSteps: [], steps: [],
     ingredients: [{ ingredientId: 'paneer', qty: 8, unit: 'oz' }, { ingredientId: 'onion', qty: 0.5, unit: 'cup' }] },
-  poha: { id: 'poha', title: 'Poha', tags: [], steps: [], ingredients: [{ ingredientId: 'onion', qty: 1, unit: 'each' }] },
+  poha: { id: 'poha', title: 'Poha', tags: [], morningSteps: [], steps: [], ingredients: [{ ingredientId: 'onion', qty: 1, unit: 'each' }] },
 };
 
 function base(over: Partial<GenerateInput> = {}): GenerateInput {
@@ -109,7 +109,7 @@ describe('generateList', () => {
 
   test('a weight-bought ingredient sums in ounces and cross-checks in count', () => {
     const tomato = { ...I.onion, id: 'tomato', name: 'Tomato', buyUnit: 'lb' as const, stockUnit: 'each' as const };
-    const R2 = { t: { id: 't', title: 'T', tags: [], steps: [], ingredients: [{ ingredientId: 'tomato', qty: 2, unit: 'cup' as const }] } };
+    const R2 = { t: { id: 't', title: 'T', tags: [], morningSteps: [], steps: [], ingredients: [{ ingredientId: 'tomato', qty: 2, unit: 'cup' as const }] } };
     const out = generateList(base({ ingredients: { ...I, tomato }, recipes: R2, days: [{ date: '2026-09-05', breakfast: [], dinner: ['t'] }], freshStock: [{ ingredientId: 'tomato', qty: 2, unit: 'each' }] }));
     const t = find(out.items, 'tomato')!;
     expect(t.needUnit).toBe('oz'); expect(t.needQty).toBeCloseTo(22.4, 1); expect(t.haveQty).toBeCloseTo(10.6, 1);
@@ -127,7 +127,7 @@ describe('pantry check', () => {
     const out = generateList(base());
     // pav uses masala (low); nothing this week uses rice or dal
     expect(out.pantryCheck).toEqual([{ ingredientId: 'masala', name: 'Pav Bhaji Masala', storeId: 'indian', isLow: true }]);
-    const withKhichdi = generateList(base({ recipes: { ...R, kh: { id: 'kh', title: 'Khichdi', tags: [], steps: [], ingredients: [{ ingredientId: 'rice', qty: 1, unit: 'cup' }, { ingredientId: 'dal', qty: 0.5, unit: 'cup' }] } }, days: [{ date: '2026-09-07', breakfast: [], dinner: ['kh'] }] }));
+    const withKhichdi = generateList(base({ recipes: { ...R, kh: { id: 'kh', title: 'Khichdi', tags: [], morningSteps: [], steps: [], ingredients: [{ ingredientId: 'rice', qty: 1, unit: 'cup' }, { ingredientId: 'dal', qty: 0.5, unit: 'cup' }] } }, days: [{ date: '2026-09-07', breakfast: [], dinner: ['kh'] }] }));
     expect(withKhichdi.pantryCheck.map((p) => [p.name, p.isLow])).toEqual([['Basmati Rice', true], ['Toor Dal', false]]);
     expect(find(withKhichdi.items, 'dal')).toBeUndefined(); // not low → reminder only, not on the list
   });

@@ -14,13 +14,14 @@ async function seed() {
 }
 
 describe('recipes', () => {
-  test('saves lines, steps and tags; pantry lines keep their amount', async () => {
+  test('saves lines, morning and evening steps and tags; pantry lines keep their amount', async () => {
     const { onion, masala } = await seed();
     const r = await request(app).post('/api/recipes').send({
-      title: 'Pav Bhaji', tags: ['veg'], steps: ['Boil the potatoes.', 'Mash.'],
+      title: 'Pav Bhaji', tags: ['veg'], morningSteps: ['Soak the peas.'], steps: ['Boil the potatoes.', 'Mash.'],
       ingredients: [{ ingredientId: onion.id, qty: 1, unit: 'cup', note: 'chopped' }, { ingredientId: masala.id, qty: 2, unit: 'tbsp' }],
     });
     expect(r.status).toBe(201);
+    expect(r.body.morningSteps).toEqual(['Soak the peas.']);
     expect(r.body.steps).toHaveLength(2);
     expect(r.body.ingredients[1]).toMatchObject({ qty: 2, unit: 'tbsp' });
   });

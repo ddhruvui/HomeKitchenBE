@@ -49,6 +49,7 @@ const RecipeLineSchema = new Schema({
 const RecipeSchema = new Schema({
   title: { type: String, required: true, trim: true },
   ingredients: { type: [RecipeLineSchema], default: [] },
+  morningSteps: { type: [String], default: [] },
   steps: { type: [String], default: [] },
   tags: { type: [String], default: [] },
 }, opts);

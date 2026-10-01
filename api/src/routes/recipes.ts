@@ -6,7 +6,7 @@ import { asyncH, bad, conflict, notFound, parse } from '../http';
 import { loadIngredientMap } from '../loaders';
 
 const line = z.object({ ingredientId: z.string().min(1), qty: z.number().optional(), unit: z.enum(ALL_UNITS as [string, ...string[]]).optional(), note: z.string().trim().optional() });
-const body = z.object({ title: z.string().trim().min(1), ingredients: z.array(line).default([]), steps: z.array(z.string().trim()).default([]), tags: z.array(z.string().trim()).default([]) });
+const body = z.object({ title: z.string().trim().min(1), ingredients: z.array(line).default([]), morningSteps: z.array(z.string().trim()).default([]), steps: z.array(z.string().trim()).default([]), tags: z.array(z.string().trim()).default([]) });
 
 async function checkLines(lines: z.infer<typeof line>[]) {
   const ings = await loadIngredientMap();
